@@ -5,10 +5,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ai_agent_downloader/screens/settings_screen.dart';
 import 'package:ai_agent_downloader/services/api_service.dart';
 import 'package:ai_agent_downloader/services/settings_service.dart';
+import 'package:ai_agent_downloader/services/update_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  const channel = MethodChannel('com.example.ai_agent_downloader/native');
+  const channel = MethodChannel('com.dowlist.com/native');
   testWidgets('Notification detail switches persist separately', (tester) async {
     SharedPreferences.setMockInitialValues({});
     var uploads = true;
@@ -26,7 +27,9 @@ void main() {
       return null;
     });
     final api = ApiService();
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SettingsScreen(settings: SettingsService(), api: api))));
+    final updates = UpdateService();
+    await updates.initialize();
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SettingsScreen(settings: SettingsService(), api: api, updates: updates))));
     await tester.pumpAndSettle();
     expect(find.text('Show upload details'), findsNothing);
     await tester.tap(find.text('Notifications'));
@@ -41,6 +44,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(downloads, false);
     await tester.pumpWidget(const SizedBox());
+    updates.dispose();
     api.dispose();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
   });

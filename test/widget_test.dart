@@ -9,8 +9,8 @@ void main() {
   testWidgets('DownList starts with unconfigured server state', (
     WidgetTester tester,
   ) async {
-    SharedPreferences.setMockInitialValues({});
-    const channel = MethodChannel('com.example.ai_agent_downloader/native');
+    SharedPreferences.setMockInitialValues({'updates_auto_check': false});
+    const channel = MethodChannel('com.dowlist.com/native');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
       switch (call.method) {
         case 'getUploadSnapshots':

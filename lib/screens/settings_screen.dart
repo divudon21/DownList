@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 import '../services/settings_service.dart';
+import '../services/update_service.dart';
 import '../widgets/settings_components.dart';
 import 'settings/about_settings_screen.dart';
 import 'settings/notification_settings_screen.dart';
 import 'settings/server_settings_screen.dart';
+import 'settings/update_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key, required this.settings, required this.api});
+  const SettingsScreen({super.key, required this.settings, required this.api, required this.updates});
 
   final SettingsService settings;
   final ApiService api;
+  final UpdateService updates;
 
   void _open(BuildContext context, Widget page) {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
@@ -36,6 +39,12 @@ class SettingsScreen extends StatelessWidget {
               title: 'Notifications',
               subtitle: 'Transfer progress and alerts',
               onTap: () => _open(context, const NotificationSettingsScreen()),
+            ),
+            SettingsRow(
+              icon: Icons.system_update_rounded,
+              title: 'Updates',
+              subtitle: 'Check for new versions',
+              onTap: () => _open(context, UpdateSettingsScreen(updates: updates)),
             ),
             SettingsRow(
               icon: Icons.info_outline_rounded,

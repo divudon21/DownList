@@ -1,4 +1,4 @@
-package com.example.ai_agent_downloader
+package com.dowlist.com
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -40,8 +40,8 @@ class TransferService : Service() {
         @Volatile var speed: Double = 0.0)
 
     companion object {
-        const val ACTION_UPLOAD = "com.example.ai_agent_downloader.UPLOAD"
-        const val ACTION_MONITOR = "com.example.ai_agent_downloader.MONITOR"
+        const val ACTION_UPLOAD = "com.dowlist.com.UPLOAD"
+        const val ACTION_MONITOR = "com.dowlist.com.MONITOR"
         private const val BUFFER_SIZE = 65536
         private const val CHANNEL_ID = "downlist_transfers"
         private const val NOTIFICATION_ID = 7314

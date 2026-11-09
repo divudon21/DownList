@@ -12,6 +12,7 @@ import 'services/api_service.dart';
 import 'services/settings_service.dart';
 import 'services/upload_manager.dart';
 import 'services/platform_service.dart';
+import 'services/update_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +30,7 @@ class _AiAgentAppState extends State<AiAgentApp> {
   late final SettingsService _settings;
   late final ApiService _api;
   late final UploadManager _uploadManager;
+  late final UpdateService _updates;
   bool _ready = false;
 
   @override
@@ -37,6 +39,7 @@ class _AiAgentAppState extends State<AiAgentApp> {
     _settings = SettingsService();
     _api = ApiService();
     _uploadManager = UploadManager(api: _api);
+    _updates = UpdateService();
     _bootstrap();
   }
 
@@ -45,6 +48,7 @@ class _AiAgentAppState extends State<AiAgentApp> {
     if (!mounted) return;
     _api.baseUrl = savedUrl;
     await _api.restoreMonitoredTasks();
+    await _updates.initialize();
     if (!mounted) return;
     setState(() {
       _ready = true;
@@ -58,6 +62,7 @@ class _AiAgentAppState extends State<AiAgentApp> {
   @override
   void dispose() {
     _uploadManager.dispose();
+    _updates.dispose();
     _api.dispose();
     super.dispose();
   }
@@ -87,6 +92,7 @@ class _AiAgentAppState extends State<AiAgentApp> {
               settings: _settings,
               api: _api,
               uploadManager: _uploadManager,
+              updates: _updates,
             )
           : const Scaffold(
               body: Center(child: CircularProgressIndicator()),
@@ -101,18 +107,73 @@ class HomePage extends StatefulWidget {
     required this.settings,
     required this.api,
     required this.uploadManager,
+    required this.updates,
   });
 
   final SettingsService settings;
   final ApiService api;
   final UploadManager uploadManager;
+  final UpdateService updates;
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int _selectedIndex = 0;
+  bool _autoChecking = false;
+  bool _updateDialogOpen = false;
+  DateTime? _pausedAt;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkUpdatesOnOpen());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) _pausedAt = DateTime.now();
+    if (state == AppLifecycleState.resumed && _pausedAt != null) {
+      final duration = DateTime.now().difference(_pausedAt!);
+      _pausedAt = null;
+      if (duration >= const Duration(seconds: 10)) _checkUpdatesOnOpen();
+    }
+  }
+
+  Future<void> _checkUpdatesOnOpen() async {
+    if (!mounted || !widget.updates.ready || !widget.updates.autoCheck || _autoChecking) return;
+    _autoChecking = true;
+    try {
+      final release = await widget.updates.check();
+      if (!mounted || release == null) return;
+      await widget.updates.notifyIfNeeded(release);
+      if (!mounted || !widget.updates.popup || _updateDialogOpen || !widget.updates.autoCheck) return;
+      final build = widget.updates.installed;
+      final compatible = build != null && release.isCompatibleWith(build);
+      _updateDialogOpen = true;
+      final open = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+        title: const Text('Update available'),
+        content: Text('${release.label} is available.${compatible ? '' : '\n\nThis release has a different signing key. Android may require uninstalling the current app first, which removes local settings.'}'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Update')),
+        ],
+      ));
+      _updateDialogOpen = false;
+      if (open == true && mounted) {
+        try { await widget.updates.openRelease(release); }
+        catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open the release page.'))); }
+      }
+    } finally { _autoChecking = false; }
+  }
 
   void _selectTab(int index) {
     setState(() {
@@ -155,6 +216,7 @@ class _HomePageState extends State<HomePage> {
           SettingsScreen(
             settings: widget.settings,
             api: widget.api,
+            updates: widget.updates,
           ),
         ];
 

@@ -6,10 +6,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ai_agent_downloader/screens/settings_screen.dart';
 import 'package:ai_agent_downloader/services/api_service.dart';
 import 'package:ai_agent_downloader/services/settings_service.dart';
+import 'package:ai_agent_downloader/services/update_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  const channel = MethodChannel('com.example.ai_agent_downloader/native');
+  const channel = MethodChannel('com.dowlist.com/native');
 
   testWidgets('Settings opens separate server and about pages', (tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -22,7 +23,9 @@ void main() {
       return null;
     });
     final api = ApiService();
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SettingsScreen(settings: SettingsService(), api: api))));
+    final updates = UpdateService();
+    await updates.initialize();
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SettingsScreen(settings: SettingsService(), api: api, updates: updates))));
     await tester.pumpAndSettle();
     expect(find.text('Server'), findsOneWidget);
     expect(find.text('Notifications'), findsOneWidget);
@@ -58,6 +61,7 @@ void main() {
     expect(find.text('Notifications'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
+    updates.dispose();
     api.dispose();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
   });

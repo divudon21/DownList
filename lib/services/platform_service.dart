@@ -62,7 +62,7 @@ class PlatformService {
   static final PlatformService instance = PlatformService._();
 
   static const MethodChannel _channel =
-      MethodChannel('com.example.ai_agent_downloader/native');
+      MethodChannel('com.dowlist.com/native');
 
   final StreamController<NativeUploadEvent> _uploadEvents =
       StreamController<NativeUploadEvent>.broadcast();
@@ -208,6 +208,12 @@ class PlatformService {
       'mimeType': mimeType,
     });
   }
+
+  Future<Map<String, dynamic>> getAppBuildInfo() async =>
+      Map<String, dynamic>.from(await _channel.invokeMapMethod<String, dynamic>('getAppBuildInfo') ?? {});
+  Future<bool> showUpdateNotification(String version, String url, bool compatible) async =>
+      await _channel.invokeMethod<bool>('showUpdateNotification', {'version': version, 'url': url, 'compatible': compatible}) ?? false;
+  Future<void> clearUpdateNotification() async { await _channel.invokeMethod<bool>('clearUpdateNotification'); }
 
   Future<String> getAppVersion() async => await _channel.invokeMethod<String>('getAppVersion') ?? '';
 

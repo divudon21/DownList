@@ -1,4 +1,4 @@
-package com.example.ai_agent_downloader
+package com.dowlist.com
 
 import android.app.Activity
 import android.content.ActivityNotFoundException
@@ -22,7 +22,7 @@ import java.util.concurrent.Executors
 class MainActivity : FlutterActivity() {
 
     companion object {
-        private const val CHANNEL_NAME = "com.example.ai_agent_downloader/native"
+        private const val CHANNEL_NAME = "com.dowlist.com/native"
         private const val REQ_PICK_FILES = 9401
         private const val ICON_SIZE_PX = 96
 
@@ -79,6 +79,44 @@ class MainActivity : FlutterActivity() {
         TransferService.eventSink = { payload -> mainHandler.post { methodChannel?.invokeMethod("onUploadEvent", payload) } }
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "getAppBuildInfo" -> {
+                    try {
+                        val flags = if (android.os.Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES
+                        val info = packageManager.getPackageInfo(packageName, flags)
+                        val signatures = if (android.os.Build.VERSION.SDK_INT >= 28) info.signingInfo?.apkContentsSigners else @Suppress("DEPRECATION") info.signatures
+                        val signature = signatures?.firstOrNull() ?: throw IllegalStateException("Signing certificate unavailable")
+                        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(signature.toByteArray()).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+                        val code = if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
+                        result.success(mapOf("versionName" to (info.versionName ?: ""), "versionCode" to code, "packageName" to packageName, "signerSha256" to hash))
+                    } catch (e: Exception) { result.error("BUILD_INFO_ERROR", "Could not read installed app information.", null) }
+                }
+                "showUpdateNotification" -> {
+                    try {
+                        val uri = Uri.parse(call.argument<String>("url") ?: "")
+                        require(uri.scheme == "https" && uri.host == "github.com" && uri.path?.startsWith("/divudon21/DownList/releases/") == true)
+                        val manager = getSystemService(android.app.NotificationManager::class.java)
+                        if (android.os.Build.VERSION.SDK_INT >= 26) {
+                            manager.createNotificationChannel(android.app.NotificationChannel("downlist_updates", "App updates", android.app.NotificationManager.IMPORTANCE_DEFAULT))
+                        }
+                        if (!manager.areNotificationsEnabled() || (android.os.Build.VERSION.SDK_INT >= 26 && manager.getNotificationChannel("downlist_updates")?.importance == android.app.NotificationManager.IMPORTANCE_NONE)) {
+                            result.success(false)
+                        } else {
+                            val launch = Intent(Intent.ACTION_VIEW, uri)
+                            val pending = android.app.PendingIntent.getActivity(this, 9351, launch, android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
+                            val builder = if (android.os.Build.VERSION.SDK_INT >= 26) android.app.Notification.Builder(this, "downlist_updates") else @Suppress("DEPRECATION") android.app.Notification.Builder(this)
+                            val version = (call.argument<String>("version") ?: "").take(80)
+                            val compatible = call.argument<Boolean>("compatible") == true
+                            val text = if (compatible) "DownList $version is available." else "DownList $version is available; reinstall may be required."
+                            manager.notify(9351, builder.setSmallIcon(android.R.drawable.stat_sys_download_done).setContentTitle("DownList update available").setContentText(text).setStyle(android.app.Notification.BigTextStyle().bigText(text)).setContentIntent(pending).setAutoCancel(true).build())
+                            result.success(true)
+                        }
+                    } catch (e: SecurityException) { result.success(false) }
+                    catch (e: Exception) { result.error("NOTIFICATION_ERROR", "Could not show update notification.", null) }
+                }
+                "clearUpdateNotification" -> {
+                    getSystemService(android.app.NotificationManager::class.java).cancel(9351)
+                    result.success(true)
+                }
                 "getAppVersion" -> {
                     try {
                         val info = packageManager.getPackageInfo(packageName, 0)
