@@ -137,7 +137,6 @@ jobs:
             fi
           done
 
-          (cd release-apks && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt)
           TOOLS=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -n "$TOOLS"
           echo "::notice::Using Android build tools at $TOOLS"
@@ -169,7 +168,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/arena/a1948697-ok-ai'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_CHANNEL: ${{ inputs.release_channel || 'stable' }}
@@ -178,31 +177,13 @@ jobs:
           TAG="v1.0.${GITHUB_RUN_NUMBER}"
           TITLE="DownList ${APP_VERSION_NAME} (build ${GITHUB_RUN_NUMBER})"
           METADATA=$(python3 -c 'import json,os; print(json.dumps({"packageName":"com.dowlist.com","versionName":os.environ["APP_VERSION_NAME"],"versionCode":int(os.environ["GITHUB_RUN_NUMBER"]),"signerSha256":os.environ["APP_SIGNER_SHA256"]},separators=(",",":")))')
-          SIGNING_NOTE="Signed with the configured release key."
-          if [ "$SIGNING_MODE" = temporary ]; then
-            SIGNING_NOTE="This build uses a temporary signing key; updating an installation signed with another key requires reinstalling and removes local app settings."
+          NOTES="release_notes/${APP_VERSION_NAME}.md"
+          if [ ! -s "$NOTES" ]; then
+            echo "::error::Missing release notes for version ${APP_VERSION_NAME}: $NOTES"
+            exit 1
           fi
-
-          cat <<EOF > /tmp/release_notes.md
-          ## DownList — Android Release (${TAG})
-
-          <!-- downlist-update:${METADATA} -->
-
-          ${SIGNING_NOTE}
-
-          Signed release APKs built automatically from commit \`${GITHUB_SHA}\`.
-
-          ### Which APK should I install?
-          - **\`DownList-arm64-v8a.apk\`** *(Recommended)* — Modern 64-bit Android phones & tablets.
-          - **\`DownList-armeabi-v7a.apk\`** — Older 32-bit ARM Android devices.
-          - **\`DownList-universal.apk\`** — Universal APK supporting all CPU architectures.
-          - **\`DownList-x86_64.apk\`** — Android emulators / Chromebooks (x86_64).
-
-          ### SHA-256 Checksums
-          \`\`\`
-          $(cat release-apks/SHA256SUMS.txt)
-          \`\`\`
-          EOF
+          cat "$NOTES" > /tmp/release_notes.md
+          printf '\n<!-- downlist-update:%s -->\n' "$METADATA" >> /tmp/release_notes.md
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "::error::Release $TAG already exists; refusing to replace signed artifacts."
@@ -211,7 +192,7 @@ jobs:
           PRERELEASE=()
           if [ "$RELEASE_CHANNEL" = beta ]; then PRERELEASE=(--prerelease); fi
           gh release create "$TAG" \
-            release-apks/*.apk release-apks/SHA256SUMS.txt \
+            release-apks/*.apk \
             --target "${GITHUB_SHA}" \
             --title "$TITLE" \
             --notes-file /tmp/release_notes.md "${PRERELEASE[@]}"

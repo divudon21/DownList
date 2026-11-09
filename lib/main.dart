@@ -9,6 +9,7 @@ import 'screens/settings_screen.dart';
 import 'screens/task_screen.dart';
 import 'screens/upload_screen.dart';
 import 'services/api_service.dart';
+import 'services/appearance_service.dart';
 import 'services/settings_service.dart';
 import 'services/upload_manager.dart';
 import 'services/platform_service.dart';
@@ -31,6 +32,7 @@ class _AiAgentAppState extends State<AiAgentApp> {
   late final ApiService _api;
   late final UploadManager _uploadManager;
   late final UpdateService _updates;
+  late final AppearanceService _appearance;
   bool _ready = false;
 
   @override
@@ -40,6 +42,7 @@ class _AiAgentAppState extends State<AiAgentApp> {
     _api = ApiService();
     _uploadManager = UploadManager(api: _api);
     _updates = UpdateService();
+    _appearance = AppearanceService();
     _bootstrap();
   }
 
@@ -49,6 +52,7 @@ class _AiAgentAppState extends State<AiAgentApp> {
     _api.baseUrl = savedUrl;
     await _api.restoreMonitoredTasks();
     await _updates.initialize();
+    await _appearance.initialize();
     if (!mounted) return;
     setState(() {
       _ready = true;
@@ -63,40 +67,33 @@ class _AiAgentAppState extends State<AiAgentApp> {
   void dispose() {
     _uploadManager.dispose();
     _updates.dispose();
+    _appearance.dispose();
     _api.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return ListenableBuilder(
+      listenable: _appearance,
+      builder: (context, _) => MaterialApp(
       title: 'DownList',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.system,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4F46E5),
-          brightness: Brightness.light,
-        ),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6366F1),
-          brightness: Brightness.dark,
-        ),
-      ),
+      themeMode: _appearance.themeMode,
+      theme: _appearance.theme(Brightness.light),
+      darkTheme: _appearance.theme(Brightness.dark),
       home: _ready
           ? HomePage(
               settings: _settings,
               api: _api,
               uploadManager: _uploadManager,
               updates: _updates,
+              appearance: _appearance,
             )
           : const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             ),
+      ),
     );
   }
 }
@@ -108,12 +105,14 @@ class HomePage extends StatefulWidget {
     required this.api,
     required this.uploadManager,
     required this.updates,
+    required this.appearance,
   });
 
   final SettingsService settings;
   final ApiService api;
   final UploadManager uploadManager;
   final UpdateService updates;
+  final AppearanceService appearance;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -217,6 +216,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             settings: widget.settings,
             api: widget.api,
             updates: widget.updates,
+            appearance: widget.appearance,
           ),
         ];
 

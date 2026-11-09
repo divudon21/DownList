@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:ai_agent_downloader/screens/settings_screen.dart';
 import 'package:ai_agent_downloader/services/api_service.dart';
+import 'package:ai_agent_downloader/services/appearance_service.dart';
 import 'package:ai_agent_downloader/services/settings_service.dart';
 import 'package:ai_agent_downloader/services/update_service.dart';
 
@@ -24,8 +25,10 @@ void main() {
     });
     final api = ApiService();
     final updates = UpdateService();
+    final appearance = AppearanceService();
+    await appearance.initialize();
     await updates.initialize();
-    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SettingsScreen(settings: SettingsService(), api: api, updates: updates))));
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SettingsScreen(settings: SettingsService(), api: api, updates: updates, appearance: appearance))));
     await tester.pumpAndSettle();
     expect(find.text('Server'), findsOneWidget);
     expect(find.text('Notifications'), findsOneWidget);
@@ -62,6 +65,7 @@ void main() {
 
     await tester.pumpWidget(const SizedBox());
     updates.dispose();
+    appearance.dispose();
     api.dispose();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
   });
