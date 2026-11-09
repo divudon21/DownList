@@ -118,6 +118,8 @@ jobs:
       - name: Package & verify release APKs
         run: |
           set -euo pipefail
+          set -E
+          trap 'echo "::error::Verification failed at line $LINENO: $BASH_COMMAND"' ERR
           mkdir -p release-apks
           ls -lh build/app/outputs/flutter-apk/
 
@@ -138,13 +140,15 @@ jobs:
           (cd release-apks && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt)
           TOOLS=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
           test -n "$TOOLS"
+          echo "::notice::Using Android build tools at $TOOLS"
           AAPT="$(dirname "$TOOLS")/aapt"
           test -x "$AAPT"
           SIGNER=$("$TOOLS" verify --print-certs release-apks/DownList-universal.apk | awk -F ': ' '/Signer #1 certificate SHA-256 digest:/ && !seen++ {print $2}')
+          echo "::notice::Signing fingerprint length: ${#SIGNER}"
           test "${#SIGNER}" -eq 64
           for apk in release-apks/*.apk; do
             BADGING=$("$AAPT" dump badging "$apk" | sed -n '1p')
-            echo "$BADGING"
+            echo "::notice::$BADGING"
             [[ "$BADGING" == *"name='com.dowlist.com'"* ]]
             [[ "$BADGING" == *"versionCode='$GITHUB_RUN_NUMBER'"* ]]
             ACTUAL=$("$TOOLS" verify --print-certs "$apk" | awk -F ': ' '/Signer #1 certificate SHA-256 digest:/ && !seen++ {print $2}')
