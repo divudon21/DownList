@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:liquid_glass_bottom_nav/liquid_glass_bottom_nav.dart';
 
 import 'widgets/server_info_sheet.dart';
 
@@ -29,7 +30,9 @@ void main() {
 }
 
 class AiAgentApp extends StatefulWidget {
-  const AiAgentApp({super.key});
+  const AiAgentApp({super.key, this.impellerSupported = true});
+
+  final bool impellerSupported;
 
   @override
   State<AiAgentApp> createState() => _AiAgentAppState();
@@ -100,6 +103,7 @@ class _AiAgentAppState extends State<AiAgentApp> {
               updates: _updates,
               appearance: _appearance,
               homeExpandedOnStart: _homeExpandedOnStart,
+              impellerSupported: widget.impellerSupported,
             )
           : const Scaffold(
               body: Center(child: CircularProgressIndicator()),
@@ -118,6 +122,7 @@ class HomePage extends StatefulWidget {
     required this.updates,
     required this.appearance,
     required this.homeExpandedOnStart,
+    required this.impellerSupported,
   });
 
   final SettingsService settings;
@@ -126,6 +131,7 @@ class HomePage extends StatefulWidget {
   final UpdateService updates;
   final AppearanceService appearance;
   final bool homeExpandedOnStart;
+  final bool impellerSupported;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -204,6 +210,35 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final totalActiveCount = widget.uploadManager.activeItems.length +
             widget.api.activeServerTaskCount;
 
+        final navItems = <LiquidGlassNavItem>[
+          LiquidGlassNavItem(
+            id: 'home',
+            icon: _selectedIndex == 0 ? Icons.home : Icons.home_outlined,
+            label: 'Home',
+          ),
+          LiquidGlassNavItem(
+            id: 'tasks',
+            icon: _selectedIndex == 1 ? Icons.file_download : Icons.file_download_outlined,
+            label: 'Task',
+            badgeCount: totalActiveCount > 0 ? totalActiveCount : null,
+          ),
+          LiquidGlassNavItem(
+            id: 'history',
+            icon: _selectedIndex == 2 ? Icons.history : Icons.history_outlined,
+            label: 'History',
+          ),
+          LiquidGlassNavItem(
+            id: 'upload',
+            icon: _selectedIndex == 3 ? Icons.cloud_upload : Icons.cloud_upload_outlined,
+            label: 'Upload',
+          ),
+          LiquidGlassNavItem(
+            id: 'settings',
+            icon: _selectedIndex == 4 ? Icons.settings : Icons.settings_outlined,
+            label: 'Settings',
+          ),
+        ];
+
         final pages = <Widget>[
           HomeScreen(
             api: widget.api,
@@ -234,7 +269,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ),
         ];
 
+        final media = MediaQuery.of(context);
+        final pageMedia = media.copyWith(
+          padding: media.padding.copyWith(
+            bottom: media.padding.bottom + LiquidGlassNavBar.contentBottomInset,
+          ),
+        );
+
         return Scaffold(
+          extendBody: true,
           appBar: AppBar(
             titleSpacing: 16,
             title: _selectedIndex == 4
@@ -271,77 +314,53 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ] : null,
           ),
           body: SafeArea(
+            bottom: false,
             child: Stack(
               fit: StackFit.expand,
-              children: List<Widget>.generate(pages.length, (index) {
-                final selected = index == _selectedIndex;
-                return Positioned.fill(
-                  child: IgnorePointer(
-                    ignoring: !selected,
-                    child: ExcludeSemantics(
-                      excluding: !selected,
-                      child: AnimatedScale(
-                        scale: selected ? 1 : 0.985,
-                        duration: const Duration(milliseconds: 200),
-                        curve: Curves.easeOutCubic,
-                        child: AnimatedOpacity(
-                          opacity: selected ? 1 : 0,
+              children: [
+                ...List<Widget>.generate(pages.length, (index) {
+                  final selected = index == _selectedIndex;
+                  return Positioned.fill(
+                    child: IgnorePointer(
+                      ignoring: !selected,
+                      child: ExcludeSemantics(
+                        excluding: !selected,
+                        child: AnimatedScale(
+                          scale: selected ? 1 : 0.985,
                           duration: const Duration(milliseconds: 200),
-                          curve: Curves.linear,
-                          child: pages[index],
+                          curve: Curves.easeOutCubic,
+                          child: AnimatedOpacity(
+                            opacity: selected ? 1 : 0,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.linear,
+                            child: MediaQuery(data: pageMedia, child: pages[index]),
+                          ),
                         ),
                       ),
                     ),
+                  );
+                }),
+                LiquidGlassNavBar(
+                  key: const ValueKey('bottom-navigation'),
+                  items: navItems,
+                  selectedIndex: _selectedIndex,
+                  onTap: _selectTab,
+                  activeColor: Theme.of(context).colorScheme.primary,
+                  inactiveColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                  labelStyle: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.1,
                   ),
-                );
-              }),
-            ),
-          ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: _selectTab,
-            animationDuration: const Duration(milliseconds: 240),
-            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-            indicatorColor: Theme.of(context).colorScheme.secondaryContainer,
-            indicatorShape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-            ),
-            destinations: [
-              const NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: 'Home',
-              ),
-              NavigationDestination(
-                icon: Badge.count(
-                  count: totalActiveCount,
-                  isLabelVisible: totalActiveCount > 0,
-                  child: const Icon(Icons.file_download_outlined),
+                  iconSize: 22,
+                  insets: 14,
+                  borderRadius: 30,
+                  dragRainbowBorder: true,
+                  liquidActiveBubble: true,
+                  impellerSupported: widget.impellerSupported,
                 ),
-                selectedIcon: Badge.count(
-                  count: totalActiveCount,
-                  isLabelVisible: totalActiveCount > 0,
-                  child: const Icon(Icons.file_download),
-                ),
-                label: 'Task',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.history_outlined),
-                selectedIcon: Icon(Icons.history),
-                label: 'History',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.cloud_upload_outlined),
-                selectedIcon: Icon(Icons.cloud_upload),
-                label: 'Upload',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings),
-                label: 'Settings',
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liquid_glass_bottom_nav/liquid_glass_bottom_nav.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,27 +21,27 @@ void main() {
       }
       return null;
     });
-    await tester.pumpWidget(const AiAgentApp());
+    await tester.pumpWidget(const AiAgentApp(impellerSupported: false));
     await tester.pumpAndSettle();
 
     expect(find.text('DownList'), findsOneWidget);
     expect(find.text('Remote Download'), findsOneWidget);
-    final navigation = tester.widget<NavigationBar>(find.byType(NavigationBar));
-    expect(navigation.destinations, hasLength(5));
+    final navigation = tester.widget<LiquidGlassNavBar>(find.byType(LiquidGlassNavBar));
+    expect(navigation.items, hasLength(5));
     for (final label in ['Home', 'Task', 'History', 'Upload', 'Settings']) {
       expect(
-        find.descendant(of: find.byType(NavigationBar), matching: find.text(label)),
+        find.descendant(of: find.byType(LiquidGlassNavBar), matching: find.text(label)),
         findsOneWidget,
       );
     }
     expect(navigation.selectedIndex, 0);
     await tester.tap(find.descendant(
-      of: find.byType(NavigationBar), matching: find.text('History')));
+      of: find.byType(LiquidGlassNavBar), matching: find.text('History')));
     await tester.pump(const Duration(milliseconds: 100));
-    expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 2);
+    expect(tester.widget<LiquidGlassNavBar>(find.byType(LiquidGlassNavBar)).selectedIndex, 2);
     await tester.pumpAndSettle();
     await tester.tap(find.descendant(
-      of: find.byType(NavigationBar), matching: find.text('Home')));
+      of: find.byType(LiquidGlassNavBar), matching: find.text('Home')));
     await tester.pumpAndSettle();
     expect(find.text('GoFile'), findsNothing);
     await tester.tap(find.byType(TextFormField));
@@ -48,10 +49,10 @@ void main() {
     expect(find.text('GoFile'), findsOneWidget);
     expect(find.text('Clipboard'), findsOneWidget);
     await tester.tap(find.descendant(
-      of: find.byType(NavigationBar), matching: find.text('History')));
+      of: find.byType(LiquidGlassNavBar), matching: find.text('History')));
     await tester.pumpAndSettle();
     await tester.tap(find.descendant(
-      of: find.byType(NavigationBar), matching: find.text('Home')));
+      of: find.byType(LiquidGlassNavBar), matching: find.text('Home')));
     await tester.pumpAndSettle();
     expect(find.text('Start Download'), findsOneWidget);
     expect(find.text('GoFile'), findsOneWidget);

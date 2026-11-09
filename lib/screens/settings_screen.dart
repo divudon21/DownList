@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_bottom_nav/liquid_glass_bottom_nav.dart';
 
 import '../services/api_service.dart';
 import '../services/appearance_service.dart';
@@ -29,7 +30,7 @@ class SettingsScreen extends StatelessWidget {
     return ColoredBox(
       color: Theme.of(context).colorScheme.surfaceContainer,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 32 + LiquidGlassNavBar.contentBottomInset),
         children: [
           SettingsGroup(children: [
             SettingsRow(
