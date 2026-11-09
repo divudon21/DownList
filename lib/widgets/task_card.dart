@@ -20,7 +20,7 @@ class TaskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isVideo = task.isVideo;
-    final indeterminate = task.isActive && task.totalSize <= 0;
+    final indeterminate = task.isActive && (task.totalSize <= 0 || (task.isGofileTransfer && task.status == 'completed') || (task.isGofileUpload && !task.gofileUploadProgressKnown));
 
     return Card(
       elevation: 0,
@@ -101,8 +101,8 @@ class TaskCard extends StatelessWidget {
                 Expanded(
                   child: _stat(
                     context,
-                    'Downloaded',
-                    task.downloadedFormatted,
+                    task.status == 'uploading_to_gofile' ? 'Uploaded' : 'Downloaded',
+                    task.isGofileUpload && !task.gofileUploadProgressKnown ? '--' : task.downloadedFormatted,
                     Icons.done_outline,
                   ),
                 ),
@@ -158,6 +158,13 @@ class TaskCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (task.isActive) TextButton.icon(
+                  onPressed: () async {
+                    try { await api.cancelTask(task.taskId); onRefresh?.call(); }
+                    catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); }
+                  },
+                  icon: const Icon(Icons.cancel_outlined), label: const Text('Cancel'),
+                ),
                 OutlinedButton.icon(
                   onPressed: () async {
                     if (onRefresh != null) {

@@ -122,6 +122,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  if (_tasks.isNotEmpty)
+                    TextButton.icon(onPressed: _clearAll, icon: const Icon(Icons.delete_sweep_outlined), label: const Text('Clear all server files')),
                   if (_error != null && widget.api.isConfigured) ...[
                     const SizedBox(height: 10),
                     _errorBanner(_error!),
@@ -167,6 +169,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _clearAll() async {
+    final confirmed = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Delete all server files?'),
+      content: const Text('This cancels active server tasks and deletes all server files and history. GoFile copies are not deleted.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete all'))],
+    ));
+    if (confirmed != true) return;
+    try { await widget.api.deleteAllTasks(); } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); }
   }
 
   Widget _errorBanner(String message) {

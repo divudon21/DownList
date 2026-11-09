@@ -136,6 +136,9 @@ class UploadItem {
 class UploadManager extends ChangeNotifier {
   UploadManager({required this.api}) {
     _sub = PlatformService.instance.uploadEvents.listen(_onNativeEvent);
+    PlatformService.instance.getUploadSnapshots().then((items) {
+      for (final item in items) { _onNativeEvent(item); }
+    }).catchError((_) {});
   }
 
   static const int maxConcurrentUploads = 2;
@@ -335,7 +338,12 @@ class UploadManager extends ChangeNotifier {
   }
 
   void _onNativeEvent(NativeUploadEvent event) {
-    final idx = _items.indexWhere((i) => i.id == event.uploadId);
+    var idx = _items.indexWhere((i) => i.id == event.uploadId);
+    if (idx == -1 && event.uri != null && event.fileName != null && event.uploadId.isNotEmpty) {
+      _items.add(UploadItem(id: event.uploadId, uri: event.uri!, fileName: event.fileName!,
+        totalBytes: event.totalBytes ?? 0, mimeType: 'application/octet-stream', addedAt: DateTime.now()));
+      idx = _items.length - 1;
+    }
     if (idx == -1) return;
     final item = _items[idx];
 

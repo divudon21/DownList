@@ -33,3 +33,11 @@ android/app/src/main/kotlin/io/flutter/plugins/GeneratedPluginRegistrant.kt
 *.aab
 release/
 release-apks/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Local-only server deployment files
+huggingface_server/
+downloads/

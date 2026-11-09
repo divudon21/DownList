@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../services/api_service.dart';
 import '../services/platform_service.dart';
 import '../services/upload_manager.dart';
+import 'player_picker_sheet.dart';
 
 class UploadItemCard extends StatelessWidget {
   const UploadItemCard({
@@ -377,24 +378,11 @@ class UploadItemCard extends StatelessWidget {
       item.extension,
       isAudio: item.isAudio,
     );
-    try {
-      await PlatformService.instance.openExternalPlayer(
-        url: url,
-        fileName: item.fileName,
-        mimeType: mime,
-      );
-    } on PlatformException catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message ?? 'Could not open video player')),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Player error: $e')),
-        );
-      }
-    }
+    await openStreamWithPlayerPicker(
+      context,
+      url: url,
+      fileName: item.fileName,
+      mimeType: mime,
+    );
   }
 }

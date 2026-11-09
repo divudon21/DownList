@@ -2,9 +2,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsService {
   static const String _keyServerUrl = 'server_url';
+  static const String _keyNotificationAsked = 'notification_permission_asked';
 
   late final Future<SharedPreferences> _prefs =
       SharedPreferences.getInstance();
+
+  Future<bool> notificationPermissionAsked() async => (await _prefs).getBool(_keyNotificationAsked) ?? false;
+  Future<void> markNotificationPermissionAsked() async { await (await _prefs).setBool(_keyNotificationAsked, true); }
 
   Future<String> getServerUrl() async {
     final prefs = await _prefs;

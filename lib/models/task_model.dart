@@ -14,6 +14,8 @@ class TaskModel {
     this.etaSeconds,
     this.verified,
     this.gofileUrl,
+    this.taskType,
+    this.localDeleted = false,
   });
 
   final String taskId;
@@ -30,6 +32,12 @@ class TaskModel {
   final int? etaSeconds;
   final bool? verified;
   final String? gofileUrl;
+  final String? taskType;
+  final bool localDeleted;
+  bool get hasGofileUrl => gofileUrl != null && gofileUrl!.isNotEmpty;
+  bool get isGofileTransfer => taskType == 'gofile';
+  bool get isGofileUpload => status.toLowerCase() == 'uploading_to_gofile';
+  bool get gofileUploadProgressKnown => isGofileUpload && downloaded > 0 && downloaded < totalSize;
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
     return TaskModel(
@@ -47,6 +55,8 @@ class TaskModel {
       etaSeconds: _toInt(json['eta_seconds']),
       verified: json['verified'] is bool ? json['verified'] as bool : null,
       gofileUrl: json['gofile_url']?.toString(),
+      taskType: json['task_type']?.toString(),
+      localDeleted: json['local_deleted'] == true,
     );
   }
 
@@ -80,6 +90,8 @@ class TaskModel {
       'eta_seconds': etaSeconds,
       'verified': verified,
       'gofile_url': gofileUrl,
+      'task_type': taskType,
+      'local_deleted': localDeleted,
     };
   }
 
@@ -150,7 +162,7 @@ class TaskModel {
 
   bool get isCompleted {
     final s = status.toLowerCase();
-    return s == 'completed' ||
+    return (s == 'completed' && (!isGofileTransfer || hasGofileUrl)) ||
         s == 'extracted' ||
         s == 'done' ||
         s == 'finished';
@@ -192,7 +204,7 @@ class TaskModel {
   String get statusLabel {
     switch (status.toLowerCase()) {
       case 'completed':
-        return 'Completed';
+        return isGofileTransfer && !hasGofileUrl ? 'Preparing GoFile upload' : 'Completed';
       case 'extracted':
         return 'Extracted';
       case 'error':
@@ -250,6 +262,11 @@ class ServerStatus {
     this.uptime,
     this.pingMs,
     this.temperature,
+    this.ramFree,
+    this.cpuCores,
+    this.loadAvg,
+    this.completedTasks,
+    this.totalTasks,
   });
 
   final bool serverOnline;
@@ -264,6 +281,11 @@ class ServerStatus {
   final double? uptime;
   final int? pingMs;
   final int? temperature;
+  final int? ramFree;
+  final double? cpuCores;
+  final double? loadAvg;
+  final int? completedTasks;
+  final int? totalTasks;
 
   factory ServerStatus.fromJson(Map<String, dynamic> json) {
     return ServerStatus(
@@ -276,7 +298,12 @@ class ServerStatus {
       storageFree: TaskModel._toInt(json['storage_free']),
       storagePercent: TaskModel._toDouble(json['storage_percent']),
       activeTasks: TaskModel._toInt(json['active_tasks']),
-      uptime: TaskModel._toDouble(json['uptime']),
+      uptime: TaskModel._toDouble(json['uptime_seconds'] ?? json['uptime']),
+      ramFree: TaskModel._toInt(json['ram_free']),
+      cpuCores: TaskModel._toDouble(json['cpu_cores']),
+      loadAvg: TaskModel._toDouble(json['load_avg']),
+      completedTasks: TaskModel._toInt(json['completed_tasks']),
+      totalTasks: TaskModel._toInt(json['total_tasks']),
       pingMs: TaskModel._toInt(json['ping_ms']),
       temperature: TaskModel._toInt(json['temperature']),
     );

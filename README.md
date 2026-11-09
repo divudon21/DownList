@@ -1,12 +1,30 @@
-# AI Agent Downloader
+# DownList
 
-Material 3 Flutter Android client for remote server downloads, multi-file streaming uploads, live task monitoring, and external media player streaming.
+DownList is a Flutter Android app for managing downloads and uploads on your own compatible server.
 
 ## Features
 
-- **Manual Server Configuration (`Settings`)** — Enter and save your own server URL on-device via `SharedPreferences` (no default or hardcoded server URL).
-- **Remote Downloads (`Home`)** — Paste any file URL and start server-side downloads via `POST /start_download`.
-- **Multi-File Streaming Uploads (`Upload`)** — Select one or multiple files simultaneously, view file sizes, live upload speed, uploaded/total bytes, ETA, and cancel individual or all active uploads at any time (`POST /upload`).
-- **Live Task Tracking (`Task`)** — Real-time monitoring of both active server downloads (`GET /history` & `GET /status/{id}`) and active file uploads.
-- **History & Direct Video Player Streaming (`History`)** — Browse completed & failed items, copy download links, inspect file metadata, and launch streams (`GET /stream/{id}`) directly in installed Android video/media players instead of the browser.
-- **Automated Signed APK Releases (`.github/workflows/android-apk.yml`)** — Builds signed `arm64-v8a`, `armeabi-v7a`, `x86_64`, and `universal` APKs via GitHub Actions and publishes them to GitHub Releases.
+- Start remote downloads and URL-to-GoFile transfers.
+- Upload files from your device and follow live task progress.
+- Browse history and stream media in an installed player.
+- Configure notifications, server connection, and app update preferences.
+
+## Getting started
+
+1. Download an APK from [Releases](https://github.com/divudon21/DownList/releases).
+2. Install it on your Android device.
+3. Open **Settings → Server** and enter your own server URL.
+
+A compatible server is required; no server address is preconfigured. Changing the Android package name installs this version as a separate app, so previous local settings are not transferred.
+
+## Development
+
+Install Flutter and the Android SDK, then run:
+
+```sh
+flutter pub get
+flutter test
+flutter run
+```
+
+Release APKs must use the same Android signing key to update an existing installation. The release workflow supports a persistent key through GitHub Actions secrets; temporary-key builds require reinstalling if their signatures differ.

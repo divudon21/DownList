@@ -16,6 +16,20 @@ class PickedFileInfo {
   final String mimeType;
 }
 
+class MediaPlayerApp {
+  const MediaPlayerApp({
+    required this.packageName,
+    required this.activityName,
+    required this.label,
+    required this.iconBytes,
+  });
+
+  final String packageName;
+  final String activityName;
+  final String label;
+  final Uint8List iconBytes;
+}
+
 class NativeUploadEvent {
   const NativeUploadEvent({
     required this.uploadId,
@@ -25,6 +39,8 @@ class NativeUploadEvent {
     this.speed,
     this.responseBody,
     this.error,
+    this.uri,
+    this.fileName,
   });
 
   final String uploadId;
@@ -34,6 +50,8 @@ class NativeUploadEvent {
   final double? speed;
   final String? responseBody;
   final String? error;
+  final String? uri;
+  final String? fileName;
 }
 
 class PlatformService {
@@ -44,7 +62,7 @@ class PlatformService {
   static final PlatformService instance = PlatformService._();
 
   static const MethodChannel _channel =
-      MethodChannel('com.example.ai_agent_downloader/native');
+      MethodChannel('com.dowlist.com/native');
 
   final StreamController<NativeUploadEvent> _uploadEvents =
       StreamController<NativeUploadEvent>.broadcast();
@@ -65,6 +83,8 @@ class PlatformService {
           speed: (map['speed'] as num?)?.toDouble(),
           responseBody: map['responseBody']?.toString(),
           error: map['error']?.toString(),
+          uri: map['uri']?.toString(),
+          fileName: map['fileName']?.toString(),
         ),
       );
     }
@@ -101,6 +121,31 @@ class PlatformService {
     });
   }
 
+  Future<void> monitorServerTask(String baseUrl, String taskId, {required bool isGofile}) async {
+    await _channel.invokeMethod<bool>('startServerMonitor', {'baseUrl': baseUrl, 'taskId': taskId, 'isGofile': isGofile});
+  }
+
+  Future<Map<String, bool>> getNotificationSettings() async {
+    final result = await _channel.invokeMapMethod<String, dynamic>('getNotificationSettings') ?? {};
+    return {'uploads': result['uploads'] == true, 'downloads': result['downloads'] == true, 'enabled': result['enabled'] == true};
+  }
+
+  Future<bool> requestNotificationPermission() async => await _channel.invokeMethod<bool>('requestNotificationPermission') ?? false;
+  Future<void> setNotificationSetting(String key, bool value) async { await _channel.invokeMethod<bool>('setNotificationSetting', {'key': key, 'value': value}); }
+  Future<void> openNotificationSettings() async { await _channel.invokeMethod<bool>('openNotificationSettings'); }
+  Future<List<dynamic>> getServerTaskSnapshots() async => await _channel.invokeListMethod<dynamic>('getServerTaskSnapshots') ?? [];
+
+  Future<List<NativeUploadEvent>> getUploadSnapshots() async {
+    final raw = await _channel.invokeListMethod<dynamic>('getUploadSnapshots') ?? [];
+    return raw.whereType<Map>().map((e) {
+      final m = Map<dynamic, dynamic>.from(e);
+      return NativeUploadEvent(uploadId: '${m['uploadId'] ?? ''}', status: '${m['status'] ?? ''}',
+        uploadedBytes: (m['uploadedBytes'] as num?)?.toInt(), totalBytes: (m['totalBytes'] as num?)?.toInt(),
+        speed: (m['speed'] as num?)?.toDouble(), responseBody: m['responseBody']?.toString(), error: m['error']?.toString(),
+        uri: m['uri']?.toString(), fileName: m['fileName']?.toString());
+    }).toList();
+  }
+
   Future<void> cancelUpload(String uploadId) async {
     await _channel.invokeMethod<bool>('cancelUpload', {
       'uploadId': uploadId,
@@ -109,6 +154,47 @@ class PlatformService {
 
   Future<void> cancelAllUploads() async {
     await _channel.invokeMethod<bool>('cancelAllUploads');
+  }
+
+  Future<List<MediaPlayerApp>> getMediaPlayers({
+    required String url,
+    required String fileName,
+    required String mimeType,
+  }) async {
+    final raw = await _channel.invokeMethod<List<dynamic>>('getMediaPlayers', {
+      'url': url,
+      'fileName': fileName,
+      'mimeType': mimeType,
+    });
+    if (raw == null) return const <MediaPlayerApp>[];
+    return raw.whereType<Map>().map((entry) {
+      final m = Map<dynamic, dynamic>.from(entry);
+      final rawIcon = m['icon'];
+      final iconBytes =
+          rawIcon is Uint8List ? rawIcon : Uint8List(0);
+      return MediaPlayerApp(
+        packageName: (m['packageName'] ?? '').toString(),
+        activityName: (m['activityName'] ?? '').toString(),
+        label: (m['label'] ?? '').toString(),
+        iconBytes: iconBytes,
+      );
+    }).where((p) => p.packageName.isNotEmpty).toList();
+  }
+
+  Future<void> launchMediaPlayer({
+    required String url,
+    required String fileName,
+    required String mimeType,
+    required String packageName,
+    required String activityName,
+  }) async {
+    await _channel.invokeMethod<bool>('launchMediaPlayer', {
+      'url': url,
+      'fileName': fileName,
+      'mimeType': mimeType,
+      'packageName': packageName,
+      'activityName': activityName,
+    });
   }
 
   Future<void> openExternalPlayer({
@@ -121,6 +207,18 @@ class PlatformService {
       'fileName': fileName,
       'mimeType': mimeType,
     });
+  }
+
+  Future<Map<String, dynamic>> getAppBuildInfo() async =>
+      Map<String, dynamic>.from(await _channel.invokeMapMethod<String, dynamic>('getAppBuildInfo') ?? {});
+  Future<bool> showUpdateNotification(String version, String url, bool compatible) async =>
+      await _channel.invokeMethod<bool>('showUpdateNotification', {'version': version, 'url': url, 'compatible': compatible}) ?? false;
+  Future<void> clearUpdateNotification() async { await _channel.invokeMethod<bool>('clearUpdateNotification'); }
+
+  Future<String> getAppVersion() async => await _channel.invokeMethod<String>('getAppVersion') ?? '';
+
+  Future<void> openUrl(String url) async {
+    await _channel.invokeMethod<bool>('openUrl', {'url': url});
   }
 
   static String guessMediaMimeType(String extension, {bool isAudio = false}) {

@@ -4,12 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/task_model.dart';
+import 'platform_service.dart';
 
 class ApiService extends ChangeNotifier {
   ApiService({String baseUrl = ''}) : _baseUrl = _normalize(baseUrl);
 
   String _baseUrl;
   final Set<String> _sessionTaskIds = <String>{};
+  final Set<String> _gofileTaskIds = <String>{};
   int _historyVersion = 0;
   int _activeServerTaskCount = 0;
 
@@ -18,6 +20,20 @@ class ApiService extends ChangeNotifier {
   bool get isConfigured => _baseUrl.isNotEmpty;
 
   Set<String> get sessionTaskIds => Set<String>.unmodifiable(_sessionTaskIds);
+  Set<String> get gofileTaskIds => Set<String>.unmodifiable(_gofileTaskIds);
+
+  Future<void> restoreMonitoredTasks() async {
+    try {
+      final snapshot = await PlatformService.instance.getServerTaskSnapshots();
+      for (final item in snapshot.whereType<Map>()) {
+        if (item['baseUrl'] != _baseUrl) continue;
+        final id = item['taskId']?.toString() ?? '';
+        if (id.isEmpty) continue;
+        _sessionTaskIds.add(id);
+        if (item['isGofile'] == true) _gofileTaskIds.add(id);
+      }
+    } catch (_) {}
+  }
 
   int get historyVersion => _historyVersion;
 
@@ -34,6 +50,7 @@ class ApiService extends ChangeNotifier {
     if (_baseUrl == normalized) return;
     _baseUrl = normalized;
     _sessionTaskIds.clear();
+    _gofileTaskIds.clear();
     _activeServerTaskCount = 0;
     _historyVersion++;
     notifyListeners();
@@ -83,6 +100,7 @@ class ApiService extends ChangeNotifier {
         throw Exception(err ?? 'Server did not return a task_id.');
       }
       _sessionTaskIds.add(taskId);
+      PlatformService.instance.monitorServerTask(_baseUrl, taskId, isGofile: false).catchError((_) {});
       notifyListeners();
       return taskId;
     }
@@ -100,6 +118,7 @@ class ApiService extends ChangeNotifier {
       if (data['task_id'] == null && data['error'] != null) {
         throw Exception(data['error'].toString());
       }
+      if (_gofileTaskIds.contains(taskId)) data['task_type'] = 'gofile';
       return TaskModel.fromJson(data);
     }
     if (response.statusCode == 404) {
@@ -119,7 +138,11 @@ class ApiService extends ChangeNotifier {
       final list = data['history'] as List<dynamic>? ?? const [];
       return list
           .whereType<Map>()
-          .map((e) => TaskModel.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) {
+            final data = Map<String, dynamic>.from(e);
+            if (_gofileTaskIds.contains(data['task_id']?.toString())) data['task_type'] = 'gofile';
+            return TaskModel.fromJson(data);
+          })
           .where((t) => t.taskId.isNotEmpty)
           .toList();
     }
@@ -139,6 +162,42 @@ class ApiService extends ChangeNotifier {
     }
     throw Exception('Server responded with HTTP ${response.statusCode}.');
   }
+
+  Future<Map<String, dynamic>> _request(String method, String path, [Map<String, dynamic>? body]) async {
+    if (!isConfigured) throw Exception('Please configure the server URL in Settings.');
+    final uri = _uri(path);
+    final response = method == 'GET'
+        ? await http.get(uri).timeout(const Duration(seconds: 30))
+        : method == 'DELETE'
+            ? await http.delete(uri).timeout(const Duration(seconds: 30))
+            : await http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body ?? {})).timeout(const Duration(seconds: 30));
+    Map<String, dynamic> data;
+    try { data = Map<String, dynamic>.from(jsonDecode(response.body) as Map); }
+    catch (_) { throw Exception('Invalid server response (HTTP ${response.statusCode}).'); }
+    if (response.statusCode < 200 || response.statusCode >= 300 || data['error'] != null) {
+      throw Exception(data['error']?.toString() ?? data['detail']?.toString() ?? 'Server error (HTTP ${response.statusCode}).');
+    }
+    return data;
+  }
+
+  Future<String> startGofileTransfer(String url) async {
+    final data = await _request('POST', '/start_gofile_transfer', {'url': url.trim()});
+    final id = data['task_id']?.toString() ?? '';
+    if (id.isEmpty) throw Exception('Server did not return a task ID.');
+    _sessionTaskIds.add(id);
+    _gofileTaskIds.add(id);
+    PlatformService.instance.monitorServerTask(_baseUrl, id, isGofile: true).catchError((_) {});
+    notifyListeners();
+    return id;
+  }
+
+  Future<void> deleteTask(String id) async { await _request('DELETE', '/delete/$id'); notifyHistoryChanged(); }
+  Future<void> renameTask(String id, String name) async { await _request('POST', '/rename/$id', {'new_name': name}); notifyHistoryChanged(); }
+  Future<void> cancelTask(String id) async { await _request('POST', '/cancel/$id'); notifyHistoryChanged(); }
+  Future<void> deleteAllTasks() async { await _request('POST', '/delete_all'); notifyHistoryChanged(); }
+  Future<Map<String, dynamic>> getFileInfo(String id) => _request('GET', '/file_info/$id');
+  Future<Map<String, dynamic>> listZipContents(String id) => _request('GET', '/list_zip/$id');
+  Future<void> extractZip(String id) async { await _request('POST', '/extract_zip/$id'); notifyHistoryChanged(); }
 
   String get uploadEndpoint => '$_baseUrl/upload';
 
