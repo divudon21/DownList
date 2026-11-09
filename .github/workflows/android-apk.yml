@@ -168,7 +168,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/arena/a1948697-ok-ai'
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_CHANNEL: ${{ inputs.release_channel || 'stable' }}
