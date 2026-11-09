@@ -93,4 +93,20 @@ void main() {
     service.dispose();
   });
 
+  testWidgets('Incompatible release is clearly labelled as a reinstall', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final service = UpdateService(
+      client: MockClient((_) async => http.Response(jsonEncode([release(11, signer: signerB)]), 200)),
+      buildInfo: () async => {'versionName': '1.2.3', 'versionCode': 10, 'packageName': 'com.dowlist.com', 'signerSha256': signerA},
+    );
+    await service.initialize();
+    await service.check();
+    await tester.pumpWidget(MaterialApp(home: UpdateSettingsScreen(updates: service)));
+    expect(find.text('Reinstall required'), findsOneWidget);
+    expect(find.text('View release'), findsOneWidget);
+    expect(find.textContaining('cannot be installed over this app'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    service.dispose();
+  });
+
 }

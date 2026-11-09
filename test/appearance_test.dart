@@ -9,26 +9,32 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('Preferences persist and invalid values fall back safely', () async {
-    SharedPreferences.setMockInitialValues({'appearance_theme': 'invalid', 'appearance_accent': 'invalid'});
+    SharedPreferences.setMockInitialValues({'appearance_theme': 'invalid', 'appearance_accent': 'invalid', 'appearance_font': 'invalid'});
     final appearance = AppearanceService();
     await appearance.initialize();
     expect(appearance.themeMode, ThemeMode.system);
     expect(appearance.accent.id, 'indigo');
+    expect(appearance.font.id, 'system');
     await appearance.setThemeMode(ThemeMode.dark);
     await appearance.setHighContrastDark(true);
     await appearance.setAccent(appAccents[3]);
+    await appearance.setFont(appFonts[2]);
     final restored = AppearanceService();
     await restored.initialize();
     expect(restored.themeMode, ThemeMode.dark);
     expect(restored.highContrastDark, isTrue);
     expect(restored.accent.id, 'teal');
+    expect(restored.font.id, 'nunito');
+    expect(restored.theme(Brightness.dark).textTheme.bodyMedium!.fontFamily, 'Nunito');
     expect(restored.theme(Brightness.dark).colorScheme.surface, Colors.black);
     expect(restored.theme(Brightness.light).colorScheme.surface, isNot(Colors.black));
+    await restored.setFont(appFonts.first);
+    expect(restored.theme(Brightness.light).textTheme.bodyMedium!.fontFamily, isNot('Nunito'));
     appearance.dispose();
     restored.dispose();
   });
 
-  test('All 12 accents generate distinct light and dark schemes', () async {
+  test('All 15 accents and five text choices are present', () async {
     SharedPreferences.setMockInitialValues({});
     final appearance = AppearanceService();
     final light = <Color>{};
@@ -38,13 +44,15 @@ void main() {
       light.add(appearance.theme(Brightness.light).colorScheme.primary);
       dark.add(appearance.theme(Brightness.dark).colorScheme.primary);
     }
-    expect(appAccents.length, 12);
-    expect(light.length, 12);
-    expect(dark.length, 12);
+    expect(appAccents.length, 15);
+    expect(light.length, 15);
+    expect(dark.length, 15);
+    expect(appFonts.length, 5);
+    expect(appFonts.first.family, isNull);
     appearance.dispose();
   });
 
-  testWidgets('Appearance controls update the app theme immediately', (tester) async {
+  testWidgets('Expandable controls, text and effective light/dark behaviour', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final appearance = AppearanceService();
     await appearance.initialize();
@@ -57,20 +65,44 @@ void main() {
         home: AppearanceSettingsScreen(appearance: appearance),
       ),
     ));
+    expect(find.text('Teal'), findsNothing);
+    expect(find.text('Nunito'), findsNothing);
+    final toggle = find.byType(SwitchListTile);
+    expect(tester.widget<SwitchListTile>(toggle).onChanged, isNull);
+    await tester.tap(find.text('High contrast dark theme'));
+    await tester.pumpAndSettle();
+    expect(appearance.highContrastDark, isFalse);
     await tester.tap(find.text('App theme'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Dark'));
     await tester.pumpAndSettle();
-    expect(Theme.of(tester.element(find.text('App theme'))).brightness, Brightness.dark);
+    expect(tester.widget<SwitchListTile>(toggle).onChanged, isNotNull);
     await tester.tap(find.text('High contrast dark theme'));
     await tester.pumpAndSettle();
     expect(Theme.of(tester.element(find.text('App theme'))).colorScheme.surface, Colors.black);
     final oldColor = Theme.of(tester.element(find.text('App theme'))).colorScheme.primary;
+    await tester.tap(find.text('App colour'));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Teal'));
     await tester.tap(find.text('Teal'));
     await tester.pumpAndSettle();
     expect(appearance.accent.id, 'teal');
     expect(Theme.of(tester.element(find.text('App theme'))).colorScheme.primary, isNot(oldColor));
+    await tester.ensureVisible(find.text('App text'));
+    await tester.tap(find.text('App text'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('font-nunito')));
+    await tester.tap(find.byKey(const ValueKey('font-nunito')));
+    await tester.pumpAndSettle();
+    expect(appearance.font.id, 'nunito');
+    expect(Theme.of(tester.element(find.text('App theme'))).textTheme.bodyMedium!.fontFamily, 'Nunito');
+    await tester.ensureVisible(find.text('App theme'));
+    await tester.tap(find.text('App theme'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Light'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<SwitchListTile>(toggle).onChanged, isNull);
+    expect(appearance.highContrastDark, isTrue); // Restored when dark mode becomes active again.
     await tester.pumpWidget(const SizedBox());
     appearance.dispose();
   });

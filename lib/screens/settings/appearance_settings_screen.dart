@@ -40,6 +40,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
     listenable: appearance,
     builder: (context, _) {
       final colors = Theme.of(context).colorScheme;
+      final isDark = Theme.of(context).brightness == Brightness.dark;
       return SettingsPage(title: 'Appearance', child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const SettingsSectionTitle('Theme'),
         SettingsGroup(children: [
@@ -51,56 +52,75 @@ class AppearanceSettingsScreen extends StatelessWidget {
           ),
           SwitchListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 5),
-            secondary: Icon(Icons.contrast_rounded, color: colors.onSurfaceVariant),
+            secondary: Icon(Icons.contrast_rounded, color: isDark ? colors.onSurfaceVariant : colors.onSurface.withValues(alpha: 0.38)),
             title: const Text('High contrast dark theme', style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: const Text('Use darker surfaces in dark mode'),
+            subtitle: Text(isDark ? 'Use darker surfaces in dark mode' : 'Available when dark mode is active'),
             value: appearance.highContrastDark,
-            onChanged: appearance.setHighContrastDark,
+            onChanged: isDark ? appearance.setHighContrastDark : null,
           ),
         ]),
         const SizedBox(height: 20),
-        const SettingsSectionTitle('App colour'),
-        Container(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-          decoration: BoxDecoration(color: colors.surfaceContainerLowest, borderRadius: BorderRadius.circular(20)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Choose your accent', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            Text('${appearance.accent.name} · Applied throughout the app', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
-            const SizedBox(height: 16),
-            LayoutBuilder(builder: (context, constraints) {
-              final columns = constraints.maxWidth < 290 ? 3 : 4;
-              return GridView.builder(
-                itemCount: appAccents.length,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, mainAxisExtent: 76, crossAxisSpacing: 4, mainAxisSpacing: 8),
-                itemBuilder: (context, index) {
-                  final accent = appAccents[index];
-                  final selected = accent.id == appearance.accent.id;
-                  return Semantics(
-                    label: '${accent.name} accent',
-                    selected: selected,
-                    button: true,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => appearance.setAccent(accent),
-                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Container(
-                          width: 42, height: 42,
-                          decoration: BoxDecoration(color: accent.color, shape: BoxShape.circle, border: Border.all(color: selected ? colors.onSurface : Colors.transparent, width: 2)),
-                          child: selected ? Icon(Icons.check_rounded, color: accent.color.computeLuminance() > 0.35 ? Colors.black : Colors.white, size: 22) : null,
-                        ),
-                        const SizedBox(height: 5),
-                        Text(accent.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: selected ? FontWeight.w700 : FontWeight.w400)),
-                      ]),
-                    ),
-                  );
-                },
-              );
-            }),
-          ]),
-        ),
+        const SettingsSectionTitle('Personalisation'),
+        SettingsGroup(children: [
+          ExpansionTile(
+            key: const PageStorageKey('appearance-colours'),
+            leading: Icon(Icons.palette_outlined, color: colors.onSurfaceVariant),
+            title: const Text('App colour', style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text('${appearance.accent.name} · ${appAccents.length} colours'),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+            children: [
+              LayoutBuilder(builder: (context, constraints) {
+                final columns = constraints.maxWidth < 290 ? 3 : 5;
+                return GridView.builder(
+                  itemCount: appAccents.length,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, mainAxisExtent: 76, crossAxisSpacing: 4, mainAxisSpacing: 8),
+                  itemBuilder: (context, index) {
+                    final accent = appAccents[index];
+                    final selected = accent.id == appearance.accent.id;
+                    return Semantics(
+                      label: '${accent.name} accent',
+                      selected: selected,
+                      button: true,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () => appearance.setAccent(accent),
+                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          Container(
+                            width: 42, height: 42,
+                            decoration: BoxDecoration(color: accent.color, shape: BoxShape.circle, border: Border.all(color: selected ? colors.onSurface : Colors.transparent, width: 2)),
+                            child: selected ? Icon(Icons.check_rounded, color: accent.color.computeLuminance() > 0.35 ? Colors.black : Colors.white, size: 22) : null,
+                          ),
+                          const SizedBox(height: 5),
+                          Text(accent.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: selected ? FontWeight.w700 : FontWeight.w400)),
+                        ]),
+                      ),
+                    );
+                  },
+                );
+              }),
+            ],
+          ),
+          ExpansionTile(
+            key: const PageStorageKey('appearance-fonts'),
+            leading: Icon(Icons.text_fields_rounded, color: colors.onSurfaceVariant),
+            title: const Text('App text', style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(appearance.font.name),
+            childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            children: [
+              for (final font in appFonts)
+                ListTile(
+                  key: ValueKey('font-${font.id}'),
+                  title: Text(font.name, style: TextStyle(fontFamily: font.family, fontWeight: FontWeight.w600)),
+                  subtitle: Text(font.description, style: TextStyle(fontFamily: font.family)),
+                  trailing: appearance.font.id == font.id ? Icon(Icons.check_circle_rounded, color: colors.primary) : null,
+                  selected: appearance.font.id == font.id,
+                  onTap: () => appearance.setFont(font),
+                ),
+            ],
+          ),
+        ]),
       ]));
     },
   );

@@ -21,12 +21,32 @@ const appAccents = <AppAccent>[
   AppAccent('rose', 'Rose', Color(0xFFE11D48)),
   AppAccent('pink', 'Pink', Color(0xFFDB2777)),
   AppAccent('purple', 'Purple', Color(0xFF9333EA)),
+  AppAccent('sky', 'Sky', Color(0xFF0284C7)),
+  AppAccent('violet', 'Violet', Color(0xFF7C3AED)),
+  AppAccent('slate', 'Slate', Color(0xFF475569)),
+];
+
+class AppFont {
+  const AppFont(this.id, this.name, this.family, this.description);
+  final String id;
+  final String name;
+  final String? family;
+  final String description;
+}
+
+const appFonts = <AppFont>[
+  AppFont('system', 'System default', null, 'Use your device’s default font'),
+  AppFont('inter', 'Inter', 'Inter', 'Clean and modern'),
+  AppFont('nunito', 'Nunito', 'Nunito', 'Soft and rounded'),
+  AppFont('lato', 'Lato', 'Lato', 'Friendly and balanced'),
+  AppFont('jetbrains', 'JetBrains Mono', 'JetBrainsMono', 'Distinctive monospace'),
 ];
 
 class AppearanceService extends ChangeNotifier {
   ThemeMode themeMode = ThemeMode.system;
   bool highContrastDark = false;
   AppAccent accent = appAccents.first;
+  AppFont font = appFonts.first;
   bool _disposed = false;
 
   Future<void> initialize() async {
@@ -36,6 +56,8 @@ class AppearanceService extends ChangeNotifier {
     highContrastDark = prefs.getBool('appearance_high_contrast_dark') ?? false;
     final color = prefs.getString('appearance_accent');
     accent = appAccents.firstWhere((value) => value.id == color, orElse: () => appAccents.first);
+    final fontId = prefs.getString('appearance_font');
+    font = appFonts.firstWhere((value) => value.id == fontId, orElse: () => appFonts.first);
     _notify();
   }
 
@@ -60,6 +82,13 @@ class AppearanceService extends ChangeNotifier {
     await (await SharedPreferences.getInstance()).setString('appearance_accent', value.id);
   }
 
+  Future<void> setFont(AppFont value) async {
+    if (!appFonts.contains(value)) return;
+    font = value;
+    _notify();
+    await (await SharedPreferences.getInstance()).setString('appearance_font', value.id);
+  }
+
   ThemeData theme(Brightness brightness) {
     var colors = ColorScheme.fromSeed(seedColor: accent.color, brightness: brightness);
     if (brightness == Brightness.dark && highContrastDark) {
@@ -74,7 +103,7 @@ class AppearanceService extends ChangeNotifier {
         onSurfaceVariant: const Color(0xFFE0E0E0),
       );
     }
-    return ThemeData(useMaterial3: true, colorScheme: colors);
+    return ThemeData(useMaterial3: true, colorScheme: colors, fontFamily: font.family);
   }
 
   @override

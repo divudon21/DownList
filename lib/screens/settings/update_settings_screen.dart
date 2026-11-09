@@ -44,15 +44,15 @@ class UpdateSettingsScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(color: colors.primaryContainer, borderRadius: BorderRadius.circular(18)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Update available', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: colors.onPrimaryContainer)),
+                Text(compatible ? 'Update available' : 'Reinstall required', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: colors.onPrimaryContainer)),
                 const SizedBox(height: 4),
                 Text(release.label, style: TextStyle(color: colors.onPrimaryContainer)),
                 if (!compatible) ...[
                   const SizedBox(height: 8),
-                  Text('This release has a different signing key. Android may require uninstalling the current app first, which removes its local settings.', style: TextStyle(color: colors.onPrimaryContainer)),
+                  Text('This release has a different signing key and cannot be installed over this app. Uninstalling removes local app data. Save important settings first.', style: TextStyle(color: colors.onPrimaryContainer)),
                 ],
                 const SizedBox(height: 12),
-                FilledButton.icon(onPressed: () => _open(context, release), icon: const Icon(Icons.open_in_new_rounded), label: const Text('Update')),
+                FilledButton.icon(onPressed: () => _open(context, release), icon: const Icon(Icons.open_in_new_rounded), label: Text(compatible ? 'Update' : 'View release')),
               ]),
             ),
           ],

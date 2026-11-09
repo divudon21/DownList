@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import 'widgets/server_info_sheet.dart';
@@ -17,6 +19,12 @@ import 'services/update_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* {
+    for (final family in ['Inter', 'Nunito', 'Lato', 'JetBrainsMono']) {
+      final license = await rootBundle.loadString('assets/fonts/$family/OFL.txt');
+      yield LicenseEntryWithLineBreaks([family], license);
+    }
+  });
   runApp(const AiAgentApp());
 }
 
@@ -159,11 +167,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final compatible = build != null && release.isCompatibleWith(build);
       _updateDialogOpen = true;
       final open = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-        title: const Text('Update available'),
-        content: Text('${release.label} is available.${compatible ? '' : '\n\nThis release has a different signing key. Android may require uninstalling the current app first, which removes local settings.'}'),
+        title: Text(compatible ? 'Update available' : 'Reinstall required'),
+        content: Text('${release.label} is available.${compatible ? '' : '\n\nThis release has a different signing key and cannot be installed over this app. Uninstalling removes local app data. Save important settings first.'}'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Update')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(compatible ? 'Update' : 'View release')),
         ],
       ));
       _updateDialogOpen = false;
