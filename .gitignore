@@ -37,3 +37,7 @@ release-apks/
 # Python
 __pycache__/
 *.py[cod]
+
+# Local-only server deployment files
+huggingface_server/
+downloads/
