@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../models/task_model.dart';
 import '../services/api_service.dart';
 import '../services/platform_service.dart';
+import 'player_picker_sheet.dart';
 
 class HistoryCard extends StatelessWidget {
   const HistoryCard({
@@ -388,29 +389,12 @@ class HistoryCard extends StatelessWidget {
       isAudio: task.isAudio,
     );
 
-    try {
-      await PlatformService.instance.openExternalPlayer(
-        url: url,
-        fileName: task.fileName,
-        mimeType: mimeType,
-      );
-    } on PlatformException catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              e.message ?? 'No video player found on this device.',
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open player: $e')),
-        );
-      }
-    }
+    await openStreamWithPlayerPicker(
+      context,
+      url: url,
+      fileName: task.fileName,
+      mimeType: mimeType,
+    );
   }
 
   Future<void> _delete(BuildContext context) async {

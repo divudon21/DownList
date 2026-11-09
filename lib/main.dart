@@ -55,7 +55,7 @@ class _AiAgentAppState extends State<AiAgentApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AI Agent Downloader',
+      title: 'DownList',
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.system,
       theme: ThemeData(
@@ -109,7 +109,6 @@ class _HomePageState extends State<HomePage> {
       _selectedIndex = index;
     });
     if (index == 2) {
-      // Refresh History whenever user switches to the History tab
       widget.api.notifyHistoryChanged();
     }
   }
@@ -151,9 +150,28 @@ class _HomePageState extends State<HomePage> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text(
-              'AI Agent Downloader',
-              style: TextStyle(fontWeight: FontWeight.w700),
+            titleSpacing: 16,
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/images/downlist_logo.png',
+                    width: 30,
+                    height: 30,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'DownList',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
             ),
             centerTitle: false,
           ),

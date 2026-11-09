@@ -3,6 +3,11 @@ package com.example.ai_agent_downloader
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -13,6 +18,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
+import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -27,23 +33,45 @@ class MainActivity : FlutterActivity() {
         private const val CHANNEL_NAME = "com.example.ai_agent_downloader/native"
         private const val REQ_PICK_FILES = 9401
         private const val BUFFER_SIZE = 65536
+        private const val ICON_SIZE_PX = 96
 
         private val BROWSER_PACKAGES = setOf(
             "com.android.chrome",
             "com.chrome.beta",
             "com.chrome.dev",
             "com.chrome.canary",
+            "org.chromium.chrome",
             "org.mozilla.firefox",
+            "org.mozilla.firefox_beta",
             "org.mozilla.fenix",
+            "org.mozilla.focus",
             "com.brave.browser",
+            "com.brave.browser_beta",
             "com.microsoft.emmx",
             "com.opera.browser",
             "com.opera.mini.native",
+            "com.opera.gx",
             "com.sec.android.app.sbrowser",
+            "com.sec.android.app.sbrowser.beta",
             "com.UCMobile.intl",
+            "com.uc.browser.en",
             "com.duckduckgo.mobile.android",
             "com.vivaldi.browser",
-            "com.kiwibrowser.browser"
+            "com.kiwibrowser.browser",
+            "mark.via.gp",
+            "mark.via",
+            "com.mycompany.app.soulbrowser",
+            "com.yandex.browser",
+            "com.mi.globalbrowser",
+            "com.android.browser",
+            "com.heytap.browser",
+            "com.coloros.browser",
+            "com.vivo.browser",
+            "com.transsion.phoenix",
+            "com.jio.web",
+            "com.aloha.browser",
+            "com.android.documentsui",
+            "com.google.android.documentsui"
         )
     }
 
@@ -69,6 +97,8 @@ class MainActivity : FlutterActivity() {
                 "startUpload" -> handleStartUpload(call, result)
                 "cancelUpload" -> handleCancelUpload(call, result)
                 "cancelAllUploads" -> handleCancelAllUploads(result)
+                "getMediaPlayers" -> handleGetMediaPlayers(call, result)
+                "launchMediaPlayer" -> handleLaunchMediaPlayer(call, result)
                 "openExternalPlayer" -> handleOpenExternalPlayer(call, result)
                 else -> result.notImplemented()
             }
@@ -126,7 +156,6 @@ class MainActivity : FlutterActivity() {
                     Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             } catch (_: Exception) {
-                // Temporary read permission is already granted for this session.
             }
 
             var displayName = "file_${System.currentTimeMillis()}"
@@ -226,7 +255,7 @@ class MainActivity : FlutterActivity() {
                 ?: throw IllegalStateException("Cannot read selected file from storage")
             active.inputStream = rawStream
 
-            val boundary = "----OkAiBoundary${UUID.randomUUID().toString().replace("-", "")}"
+            val boundary = "----DownListBoundary${UUID.randomUUID().toString().replace("-", "")}"
             val safeName = fileName
                 .replace("\"", "_")
                 .replace("\r", "")
@@ -422,6 +451,201 @@ class MainActivity : FlutterActivity() {
         result.success(true)
     }
 
+    private fun queryAllActivities(intent: Intent): List<ResolveInfo> {
+        val combined = LinkedHashMap<String, ResolveInfo>()
+        try {
+            for (info in packageManager.queryIntentActivities(intent, PackageManager.MATCH_ALL)) {
+                val key = "${info.activityInfo.packageName}/${info.activityInfo.name}"
+                combined.putIfAbsent(key, info)
+            }
+        } catch (_: Exception) {
+        }
+        try {
+            for (info in packageManager.queryIntentActivities(intent, 0)) {
+                val key = "${info.activityInfo.packageName}/${info.activityInfo.name}"
+                combined.putIfAbsent(key, info)
+            }
+        } catch (_: Exception) {
+        }
+        return combined.values.toList()
+    }
+
+    private fun discoverMediaPlayers(
+        streamUrl: String,
+        fileName: String,
+        mimeType: String
+    ): List<ResolveInfo> {
+        val isAudio = mimeType.startsWith("audio/")
+        val genericMime = if (isAudio) "audio/*" else "video/*"
+        val fallbackExt = if (isAudio) "mp3" else "mp4"
+        val rawExt = fileName.substringAfterLast('.', "").lowercase()
+        val safeExt = if (rawExt.matches(Regex("[a-z0-9]{2,5}"))) rawExt else fallbackExt
+
+        // Dynamically detect generic web browser activities (apps matching a plain webpage URL)
+        val plainWebIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.example.com/"))
+        val webBrowserActivities = queryAllActivities(plainWebIntent)
+            .map { "${it.activityInfo.packageName}/${it.activityInfo.name}" }
+            .toSet()
+
+        val streamUri = Uri.parse(streamUrl)
+        // Ordered from explicit network stream handlers -> generic video/audio players
+        val probes = listOf(
+            Intent(Intent.ACTION_VIEW).apply { setDataAndType(streamUri, mimeType) },
+            Intent(Intent.ACTION_VIEW).apply { setDataAndType(streamUri, genericMime) },
+            Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(Uri.parse("http://example.com/stream.$safeExt"), genericMime)
+            },
+            Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com/stream.$safeExt")),
+            Intent(Intent.ACTION_VIEW).apply {
+                val contentSample = if (isAudio) {
+                    "content://media/external/audio/media/1"
+                } else {
+                    "content://media/external/video/media/1"
+                }
+                setDataAndType(Uri.parse(contentSample), genericMime)
+            },
+            Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(Uri.parse("file:///storage/emulated/0/stream.$safeExt"), genericMime)
+            }
+        )
+
+        val selfPkg = applicationContext.packageName
+        val byPackage = LinkedHashMap<String, ResolveInfo>()
+
+        for (probe in probes) {
+            for (info in queryAllActivities(probe)) {
+                val ai = info.activityInfo ?: continue
+                val pkg = ai.packageName ?: continue
+                val actKey = "$pkg/${ai.name}"
+                if (pkg == selfPkg) continue
+                if (!ai.exported) continue
+                if (pkg in BROWSER_PACKAGES) continue
+                if (actKey in webBrowserActivities) continue
+
+                byPackage.putIfAbsent(pkg, info)
+            }
+        }
+
+        return byPackage.values.toList()
+    }
+
+    private fun drawableToPngBytes(drawable: Drawable): ByteArray {
+        val bmp = Bitmap.createBitmap(ICON_SIZE_PX, ICON_SIZE_PX, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        drawable.setBounds(0, 0, ICON_SIZE_PX, ICON_SIZE_PX)
+        drawable.draw(canvas)
+        val out = ByteArrayOutputStream()
+        bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+        bmp.recycle()
+        return out.toByteArray()
+    }
+
+    private fun handleGetMediaPlayers(call: MethodCall, result: MethodChannel.Result) {
+        val url = call.argument<String>("url") ?: ""
+        val fileName = call.argument<String>("fileName") ?: "Stream"
+        val mimeType = call.argument<String>("mimeType") ?: "video/*"
+
+        if (url.isBlank()) {
+            result.error("INVALID_URL", "Stream URL is empty", null)
+            return
+        }
+
+        uploadExecutor.execute {
+            try {
+                val resolved = discoverMediaPlayers(url, fileName, mimeType)
+                val items = resolved.map { info ->
+                    val ai = info.activityInfo
+                    val appLabel = info.loadLabel(packageManager)?.toString()?.trim()
+                        ?.takeIf { it.isNotEmpty() }
+                        ?: ai.applicationInfo.loadLabel(packageManager)?.toString()?.trim()
+                        ?: ai.packageName
+                    val iconBytes = try {
+                        drawableToPngBytes(info.loadIcon(packageManager))
+                    } catch (_: Exception) {
+                        ByteArray(0)
+                    }
+                    Triple(
+                        appLabel,
+                        ai.packageName,
+                        mapOf<String, Any>(
+                            "packageName" to ai.packageName,
+                            "activityName" to ai.name,
+                            "label" to appLabel,
+                            "icon" to iconBytes
+                        )
+                    )
+                }.sortedBy { it.first.lowercase() }.map { it.third }
+
+                mainHandler.post {
+                    result.success(items)
+                }
+            } catch (e: Exception) {
+                mainHandler.post {
+                    result.error("QUERY_ERROR", e.message ?: "Could not query media players", null)
+                }
+            }
+        }
+    }
+
+    private fun buildStreamIntent(
+        uri: Uri,
+        fileName: String,
+        mimeType: String,
+        packageName: String? = null,
+        activityName: String? = null
+    ): Intent {
+        return Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, mimeType)
+            putExtra("title", fileName)
+            putExtra(Intent.EXTRA_TITLE, fileName)
+            putExtra("forcename", fileName)
+            putExtra("secure_uri", true)
+            if (!packageName.isNullOrBlank() && !activityName.isNullOrBlank()) {
+                setClassName(packageName, activityName)
+            } else if (!packageName.isNullOrBlank()) {
+                setPackage(packageName)
+            }
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }
+
+    private fun handleLaunchMediaPlayer(call: MethodCall, result: MethodChannel.Result) {
+        val url = call.argument<String>("url")
+        val fileName = call.argument<String>("fileName") ?: "Stream"
+        val mimeType = call.argument<String>("mimeType") ?: "video/*"
+        val packageName = call.argument<String>("packageName")
+        val activityName = call.argument<String>("activityName")
+
+        if (url.isNullOrBlank() || packageName.isNullOrBlank()) {
+            result.error("INVALID_ARGS", "Missing player launch parameters", null)
+            return
+        }
+
+        val uri = Uri.parse(url)
+        val genericMime = if (mimeType.startsWith("audio/")) "audio/*" else "video/*"
+
+        try {
+            startActivity(buildStreamIntent(uri, fileName, mimeType, packageName, activityName))
+            result.success(true)
+            return
+        } catch (_: Exception) {
+        }
+
+        try {
+            startActivity(buildStreamIntent(uri, fileName, genericMime, packageName, activityName))
+            result.success(true)
+            return
+        } catch (_: Exception) {
+        }
+
+        try {
+            startActivity(buildStreamIntent(uri, fileName, genericMime, packageName, null))
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("PLAYER_ERROR", e.message ?: "Failed to launch selected player", null)
+        }
+    }
+
     private fun handleOpenExternalPlayer(call: MethodCall, result: MethodChannel.Result) {
         val url = call.argument<String>("url")
         val fileName = call.argument<String>("fileName") ?: "Stream"
@@ -434,90 +658,18 @@ class MainActivity : FlutterActivity() {
 
         try {
             val uri = Uri.parse(url)
-            val probeIntent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, mimeType)
-                putExtra("title", fileName)
-                putExtra(Intent.EXTRA_TITLE, fileName)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-
-            val resolved = packageManager.queryIntentActivities(probeIntent, 0)
-            val players = resolved.filter { info ->
-                info.activityInfo.packageName !in BROWSER_PACKAGES
-            }
-
-            if (players.size == 1) {
+            val players = discoverMediaPlayers(url, fileName, mimeType)
+            if (players.isNotEmpty()) {
                 val target = players[0].activityInfo
-                probeIntent.setClassName(target.packageName, target.name)
-                startActivity(probeIntent)
+                startActivity(
+                    buildStreamIntent(uri, fileName, mimeType, target.packageName, target.name)
+                )
                 result.success(true)
                 return
             }
 
-            if (players.size > 1) {
-                val intents = players.map { info ->
-                    Intent(Intent.ACTION_VIEW).apply {
-                        setDataAndType(uri, mimeType)
-                        putExtra("title", fileName)
-                        putExtra(Intent.EXTRA_TITLE, fileName)
-                        setClassName(info.activityInfo.packageName, info.activityInfo.name)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                }.toMutableList()
-
-                val primary = intents.removeAt(0)
-                val chooser = Intent.createChooser(primary, "Open with Video Player").apply {
-                    if (intents.isNotEmpty()) {
-                        putExtra(Intent.EXTRA_INITIAL_INTENTS, intents.toTypedArray())
-                    }
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                startActivity(chooser)
-                result.success(true)
-                return
-            }
-
-            // Fallback: try generic video/* or audio/* MIME type
             val genericMime = if (mimeType.startsWith("audio/")) "audio/*" else "video/*"
-            val genericIntent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, genericMime)
-                putExtra("title", fileName)
-                putExtra(Intent.EXTRA_TITLE, fileName)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            val genericPlayers = packageManager.queryIntentActivities(genericIntent, 0)
-                .filter { it.activityInfo.packageName !in BROWSER_PACKAGES }
-
-            if (genericPlayers.isNotEmpty()) {
-                if (genericPlayers.size == 1) {
-                    val t = genericPlayers[0].activityInfo
-                    genericIntent.setClassName(t.packageName, t.name)
-                    startActivity(genericIntent)
-                } else {
-                    val intents = genericPlayers.map { info ->
-                        Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(uri, genericMime)
-                            putExtra("title", fileName)
-                            putExtra(Intent.EXTRA_TITLE, fileName)
-                            setClassName(info.activityInfo.packageName, info.activityInfo.name)
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                    }.toMutableList()
-                    val primary = intents.removeAt(0)
-                    val chooser = Intent.createChooser(primary, "Open with Video Player").apply {
-                        if (intents.isNotEmpty()) {
-                            putExtra(Intent.EXTRA_INITIAL_INTENTS, intents.toTypedArray())
-                        }
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    startActivity(chooser)
-                }
-                result.success(true)
-                return
-            }
-
-            // Final direct media-typed intent fallback for strict OEM ROMs
-            startActivity(genericIntent)
+            startActivity(buildStreamIntent(uri, fileName, genericMime))
             result.success(true)
         } catch (e: ActivityNotFoundException) {
             result.error(

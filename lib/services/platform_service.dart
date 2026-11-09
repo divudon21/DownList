@@ -16,6 +16,20 @@ class PickedFileInfo {
   final String mimeType;
 }
 
+class MediaPlayerApp {
+  const MediaPlayerApp({
+    required this.packageName,
+    required this.activityName,
+    required this.label,
+    required this.iconBytes,
+  });
+
+  final String packageName;
+  final String activityName;
+  final String label;
+  final Uint8List iconBytes;
+}
+
 class NativeUploadEvent {
   const NativeUploadEvent({
     required this.uploadId,
@@ -109,6 +123,47 @@ class PlatformService {
 
   Future<void> cancelAllUploads() async {
     await _channel.invokeMethod<bool>('cancelAllUploads');
+  }
+
+  Future<List<MediaPlayerApp>> getMediaPlayers({
+    required String url,
+    required String fileName,
+    required String mimeType,
+  }) async {
+    final raw = await _channel.invokeMethod<List<dynamic>>('getMediaPlayers', {
+      'url': url,
+      'fileName': fileName,
+      'mimeType': mimeType,
+    });
+    if (raw == null) return const <MediaPlayerApp>[];
+    return raw.whereType<Map>().map((entry) {
+      final m = Map<dynamic, dynamic>.from(entry);
+      final rawIcon = m['icon'];
+      final iconBytes =
+          rawIcon is Uint8List ? rawIcon : Uint8List(0);
+      return MediaPlayerApp(
+        packageName: (m['packageName'] ?? '').toString(),
+        activityName: (m['activityName'] ?? '').toString(),
+        label: (m['label'] ?? '').toString(),
+        iconBytes: iconBytes,
+      );
+    }).where((p) => p.packageName.isNotEmpty).toList();
+  }
+
+  Future<void> launchMediaPlayer({
+    required String url,
+    required String fileName,
+    required String mimeType,
+    required String packageName,
+    required String activityName,
+  }) async {
+    await _channel.invokeMethod<bool>('launchMediaPlayer', {
+      'url': url,
+      'fileName': fileName,
+      'mimeType': mimeType,
+      'packageName': packageName,
+      'activityName': activityName,
+    });
   }
 
   Future<void> openExternalPlayer({

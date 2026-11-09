@@ -43,6 +43,7 @@ jobs:
           mkdir -p /tmp/custom_android
           cp android/app/src/main/AndroidManifest.xml /tmp/custom_android/AndroidManifest.xml
           cp android/app/src/main/kotlin/com/example/ai_agent_downloader/MainActivity.kt /tmp/custom_android/MainActivity.kt
+          cp android/app/src/main/res/drawable/ic_launcher_monochrome.xml /tmp/custom_android/ic_launcher_monochrome.xml
           cp -r android/app/src/main/res/mipmap-* /tmp/custom_android/
 
           rm -rf android
@@ -52,6 +53,9 @@ jobs:
           cp /tmp/custom_android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
           mkdir -p android/app/src/main/kotlin/com/example/ai_agent_downloader
           cp /tmp/custom_android/MainActivity.kt android/app/src/main/kotlin/com/example/ai_agent_downloader/MainActivity.kt
+          mkdir -p android/app/src/main/res/drawable
+          cp /tmp/custom_android/ic_launcher_monochrome.xml android/app/src/main/res/drawable/ic_launcher_monochrome.xml
+          rm -rf android/app/src/main/res/mipmap-*
           cp -r /tmp/custom_android/mipmap-* android/app/src/main/res/
           chmod +x android/gradlew
 
@@ -62,7 +66,7 @@ jobs:
             -keystore android/app/upload-key.jks \
             -alias upload-key \
             -keyalg RSA -keysize 2048 -validity 10000 \
-            -dname "CN=AI Agent Downloader,O=OkAI,C=IN" \
+            -dname "CN=DownList,O=DownList,C=IN" \
             -storepass android -keypass android
 
           cat <<'EOF' > android/key.properties
@@ -92,10 +96,10 @@ jobs:
           mkdir -p release-apks
           ls -lh build/app/outputs/flutter-apk/
 
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk release-apks/AI-Agent-Downloader-arm64-v8a.apk
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk release-apks/AI-Agent-Downloader-armeabi-v7a.apk
-          cp build/app/outputs/flutter-apk/app-x86_64-release.apk release-apks/AI-Agent-Downloader-x86_64.apk
-          cp build/app/outputs/flutter-apk/app-release.apk release-apks/AI-Agent-Downloader-universal.apk
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk release-apks/DownList-arm64-v8a.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk release-apks/DownList-armeabi-v7a.apk
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk release-apks/DownList-x86_64.apk
+          cp build/app/outputs/flutter-apk/app-release.apk release-apks/DownList-universal.apk
 
           for apk in release-apks/*.apk; do
             size=$(stat -c%s "$apk")
@@ -111,7 +115,7 @@ jobs:
       - name: Upload APKs as workflow artifact
         uses: actions/upload-artifact@v7
         with:
-          name: AI-Agent-Downloader-APKs
+          name: DownList-APKs
           path: release-apks/
           if-no-files-found: error
 
@@ -121,18 +125,18 @@ jobs:
         run: |
           set -euo pipefail
           TAG="v1.0.${GITHUB_RUN_NUMBER}"
-          TITLE="AI Agent Downloader ${TAG}"
+          TITLE="DownList ${TAG}"
 
           cat <<EOF > /tmp/release_notes.md
-          ## AI Agent Downloader — Android Release (${TAG})
+          ## DownList — Android Release (${TAG})
 
           Signed release APKs built automatically from commit \`${GITHUB_SHA}\`.
 
           ### Which APK should I install?
-          - **\`AI-Agent-Downloader-arm64-v8a.apk\`** *(Recommended)* — Modern 64-bit Android phones & tablets.
-          - **\`AI-Agent-Downloader-armeabi-v7a.apk\`** — Older 32-bit ARM Android devices.
-          - **\`AI-Agent-Downloader-universal.apk\`** — Universal APK supporting all CPU architectures.
-          - **\`AI-Agent-Downloader-x86_64.apk\`** — Android emulators / Chromebooks (x86_64).
+          - **\`DownList-arm64-v8a.apk\`** *(Recommended)* — Modern 64-bit Android phones & tablets.
+          - **\`DownList-armeabi-v7a.apk\`** — Older 32-bit ARM Android devices.
+          - **\`DownList-universal.apk\`** — Universal APK supporting all CPU architectures.
+          - **\`DownList-x86_64.apk\`** — Android emulators / Chromebooks (x86_64).
 
           ### SHA-256 Checksums
           \`\`\`
