@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_bottom_nav/liquid_glass_bottom_nav.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -12,11 +13,13 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     required this.api,
+    this.initiallyExpanded = false,
     this.onViewTasks,
     this.onOpenSettings,
   });
 
   final ApiService api;
+  final bool initiallyExpanded;
   final VoidCallback? onViewTasks;
   final VoidCallback? onOpenSettings;
 
@@ -28,6 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _urlController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isSubmitting = false;
+  late bool _expanded;
   String? _gofileTaskId;
   String? _gofileServer;
   TaskModel? _gofileTask;
@@ -39,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _expanded = widget.initiallyExpanded;
     if (widget.api.gofileTaskIds.isNotEmpty) {
       _gofileTaskId = widget.api.gofileTaskIds.last;
       _gofileServer = widget.api.baseUrl;
@@ -168,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
       listenable: widget.api,
       builder: (context, _) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20 + LiquidGlassNavBar.contentBottomInset),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -255,64 +260,79 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCard() {
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextFormField(
-                controller: _urlController,
-                textInputAction: TextInputAction.done,
-                keyboardType: TextInputType.url,
-                textCapitalization: TextCapitalization.none,
-                onFieldSubmitted: (_) => _download(),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'Please enter a URL';
-                  }
-                  final u = v.trim();
-                  if (!(u.startsWith('http://') || u.startsWith('https://'))) {
-                    return 'URL must start with http:// or https://';
-                  }
-                  return null;
+    final colors = Theme.of(context).colorScheme;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeInOut,
+      padding: EdgeInsets.all(_expanded ? 16 : 0),
+      decoration: BoxDecoration(
+        color: _expanded ? colors.surfaceContainerHighest : Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          TextFormField(
+            controller: _urlController,
+            textInputAction: TextInputAction.done,
+            keyboardType: TextInputType.url,
+            textCapitalization: TextCapitalization.none,
+            onTap: () { if (!_expanded) setState(() => _expanded = true); },
+            onFieldSubmitted: (_) => _download(),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return 'Please enter a URL';
+              final u = v.trim();
+              if (!(u.startsWith('http://') || u.startsWith('https://'))) return 'URL must start with http:// or https://';
+              return null;
+            },
+            decoration: InputDecoration(
+              labelText: 'File URL',
+              hintText: 'https://example.com/file.mp4',
+              prefixIcon: const Icon(Icons.link_outlined),
+              suffixIcon: _expanded ? IconButton(
+                tooltip: 'Collapse download panel',
+                icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                onPressed: () {
+                  FocusScope.of(context).unfocus();
+                  setState(() => _expanded = false);
                 },
-                decoration: const InputDecoration(
-                  labelText: 'File URL',
-                  hintText: 'https://example.com/file.mp4',
-                  prefixIcon: Icon(Icons.link_outlined),
-                  border: OutlineInputBorder(),
-                  filled: true,
-                ),
-              ),
-              const SizedBox(height: 16),
+              ) : null,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              filled: true,
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: _expanded ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const SizedBox(height: 14),
               FilledButton.icon(
                 onPressed: _isSubmitting ? null : _download,
                 icon: _isSubmitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.download_rounded),
                 label: Text(_isSubmitting ? 'Starting...' : 'Start Download'),
               ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: _isSubmitting ? null : _pasteFromClipboard,
-                icon: const Icon(Icons.content_paste_rounded),
-                label: const Text('Paste from Clipboard'),
-              ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(onPressed: _isSubmitting ? null : _startGofile, icon: const Icon(Icons.cloud_upload_outlined), label: const Text('Upload to GoFile')),
-            ],
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: OutlinedButton.icon(
+                  onPressed: _isSubmitting ? null : _pasteFromClipboard,
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  icon: const Icon(Icons.content_paste_rounded, size: 18),
+                  label: const FittedBox(fit: BoxFit.scaleDown, child: Text('Clipboard')),
+                )),
+                const SizedBox(width: 8),
+                Expanded(child: OutlinedButton.icon(
+                  onPressed: _isSubmitting ? null : _startGofile,
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                  icon: const Icon(Icons.cloud_upload_outlined, size: 18),
+                  label: const FittedBox(fit: BoxFit.scaleDown, child: Text('GoFile')),
+                )),
+              ]),
+            ]) : const SizedBox(width: double.infinity),
           ),
-        ),
+        ]),
       ),
     );
   }

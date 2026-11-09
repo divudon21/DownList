@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:liquid_glass_bottom_nav/liquid_glass_bottom_nav.dart';
 
 import 'widgets/server_info_sheet.dart';
 
@@ -9,6 +12,7 @@ import 'screens/settings_screen.dart';
 import 'screens/task_screen.dart';
 import 'screens/upload_screen.dart';
 import 'services/api_service.dart';
+import 'services/appearance_service.dart';
 import 'services/settings_service.dart';
 import 'services/upload_manager.dart';
 import 'services/platform_service.dart';
@@ -16,11 +20,19 @@ import 'services/update_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* {
+    for (final family in ['Inter', 'Nunito', 'Lato', 'JetBrainsMono', 'Manrope']) {
+      final license = await rootBundle.loadString('assets/fonts/$family/OFL.txt');
+      yield LicenseEntryWithLineBreaks([family], license);
+    }
+  });
   runApp(const AiAgentApp());
 }
 
 class AiAgentApp extends StatefulWidget {
-  const AiAgentApp({super.key});
+  const AiAgentApp({super.key, this.impellerSupported = true});
+
+  final bool impellerSupported;
 
   @override
   State<AiAgentApp> createState() => _AiAgentAppState();
@@ -31,7 +43,9 @@ class _AiAgentAppState extends State<AiAgentApp> {
   late final ApiService _api;
   late final UploadManager _uploadManager;
   late final UpdateService _updates;
+  late final AppearanceService _appearance;
   bool _ready = false;
+  bool _homeExpandedOnStart = false;
 
   @override
   void initState() {
@@ -40,6 +54,7 @@ class _AiAgentAppState extends State<AiAgentApp> {
     _api = ApiService();
     _uploadManager = UploadManager(api: _api);
     _updates = UpdateService();
+    _appearance = AppearanceService();
     _bootstrap();
   }
 
@@ -49,6 +64,8 @@ class _AiAgentAppState extends State<AiAgentApp> {
     _api.baseUrl = savedUrl;
     await _api.restoreMonitoredTasks();
     await _updates.initialize();
+    await _appearance.initialize();
+    _homeExpandedOnStart = await _settings.getHomeExpandedOnStart();
     if (!mounted) return;
     setState(() {
       _ready = true;
@@ -63,40 +80,35 @@ class _AiAgentAppState extends State<AiAgentApp> {
   void dispose() {
     _uploadManager.dispose();
     _updates.dispose();
+    _appearance.dispose();
     _api.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return ListenableBuilder(
+      listenable: _appearance,
+      builder: (context, _) => MaterialApp(
       title: 'DownList',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.system,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4F46E5),
-          brightness: Brightness.light,
-        ),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6366F1),
-          brightness: Brightness.dark,
-        ),
-      ),
+      themeMode: _appearance.themeMode,
+      theme: _appearance.theme(Brightness.light),
+      darkTheme: _appearance.theme(Brightness.dark),
       home: _ready
           ? HomePage(
               settings: _settings,
               api: _api,
               uploadManager: _uploadManager,
               updates: _updates,
+              appearance: _appearance,
+              homeExpandedOnStart: _homeExpandedOnStart,
+              impellerSupported: widget.impellerSupported,
             )
           : const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             ),
+      ),
     );
   }
 }
@@ -108,12 +120,18 @@ class HomePage extends StatefulWidget {
     required this.api,
     required this.uploadManager,
     required this.updates,
+    required this.appearance,
+    required this.homeExpandedOnStart,
+    required this.impellerSupported,
   });
 
   final SettingsService settings;
   final ApiService api;
   final UploadManager uploadManager;
   final UpdateService updates;
+  final AppearanceService appearance;
+  final bool homeExpandedOnStart;
+  final bool impellerSupported;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -160,11 +178,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final compatible = build != null && release.isCompatibleWith(build);
       _updateDialogOpen = true;
       final open = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-        title: const Text('Update available'),
-        content: Text('${release.label} is available.${compatible ? '' : '\n\nThis release has a different signing key. Android may require uninstalling the current app first, which removes local settings.'}'),
+        title: Text(compatible ? 'Update available' : 'Reinstall required'),
+        content: Text('${release.label} is available.${compatible ? '' : '\n\nThis release has a different signing key and cannot be installed over this app. Uninstalling removes local app data. Save important settings first.'}'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Update')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(compatible ? 'Update' : 'View release')),
         ],
       ));
       _updateDialogOpen = false;
@@ -192,9 +210,42 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final totalActiveCount = widget.uploadManager.activeItems.length +
             widget.api.activeServerTaskCount;
 
+        const pageTitles = ['Home', 'Task', 'History', 'Upload', 'Settings'];
+        final pageTitle = pageTitles[_selectedIndex];
+
+        final navItems = <LiquidGlassNavItem>[
+          LiquidGlassNavItem(
+            id: 'home',
+            icon: _selectedIndex == 0 ? Icons.home : Icons.home_outlined,
+            label: 'Home',
+          ),
+          LiquidGlassNavItem(
+            id: 'tasks',
+            icon: _selectedIndex == 1 ? Icons.file_download : Icons.file_download_outlined,
+            label: 'Task',
+            badgeCount: totalActiveCount > 0 ? totalActiveCount : null,
+          ),
+          LiquidGlassNavItem(
+            id: 'history',
+            icon: _selectedIndex == 2 ? Icons.history : Icons.history_outlined,
+            label: 'History',
+          ),
+          LiquidGlassNavItem(
+            id: 'upload',
+            icon: _selectedIndex == 3 ? Icons.cloud_upload : Icons.cloud_upload_outlined,
+            label: 'Upload',
+          ),
+          LiquidGlassNavItem(
+            id: 'settings',
+            icon: _selectedIndex == 4 ? Icons.settings : Icons.settings_outlined,
+            label: 'Settings',
+          ),
+        ];
+
         final pages = <Widget>[
           HomeScreen(
             api: widget.api,
+            initiallyExpanded: widget.homeExpandedOnStart,
             onViewTasks: () => _selectTab(1),
             onOpenSettings: () => _selectTab(4),
           ),
@@ -217,35 +268,47 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             settings: widget.settings,
             api: widget.api,
             updates: widget.updates,
+            appearance: widget.appearance,
           ),
         ];
 
+        final media = MediaQuery.of(context);
+        final pageMedia = media.copyWith(
+          padding: media.padding.copyWith(
+            bottom: media.padding.bottom + LiquidGlassNavBar.contentBottomInset,
+          ),
+        );
+
+        final glassNavigation = LiquidGlassNavBar(
+          key: const ValueKey('bottom-navigation'),
+          items: navItems,
+          selectedIndex: _selectedIndex,
+          onTap: _selectTab,
+          activeColor: Theme.of(context).colorScheme.primary,
+          inactiveColor: Theme.of(context).colorScheme.onSurfaceVariant,
+          labelStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.1,
+          ),
+          iconSize: 22,
+          insets: 14,
+          borderRadius: 30,
+          dragRainbowBorder: true,
+          liquidActiveBubble: true,
+          impellerSupported: widget.impellerSupported,
+        );
+
         return Scaffold(
+          extendBody: true,
           appBar: AppBar(
             titleSpacing: 16,
-            title: _selectedIndex == 4
-                ? const Text('Settings', style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: -0.3))
-                : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    'assets/images/downlist_logo.png',
-                    width: 30,
-                    height: 30,
-                    filterQuality: FilterQuality.high,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'DownList',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-              ],
+            title: Text(
+              pageTitle,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
+              ),
             ),
             centerTitle: false,
             actions: _selectedIndex == 0 ? [
@@ -257,51 +320,42 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ] : null,
           ),
           body: SafeArea(
-            child: IndexedStack(
-              index: _selectedIndex,
-              children: pages,
+            bottom: false,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ...List<Widget>.generate(pages.length, (index) {
+                  final selected = index == _selectedIndex;
+                  return Positioned.fill(
+                    child: IgnorePointer(
+                      ignoring: !selected,
+                      child: ExcludeSemantics(
+                        excluding: !selected,
+                        child: AnimatedScale(
+                          scale: selected ? 1 : 0.985,
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOutCubic,
+                          child: AnimatedOpacity(
+                            opacity: selected ? 1 : 0,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.linear,
+                            child: MediaQuery(data: pageMedia, child: pages[index]),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+                widget.impellerSupported
+                    ? glassNavigation
+                    : Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: glassNavigation,
+                      ),
+              ],
             ),
-          ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: _selectTab,
-            animationDuration: const Duration(milliseconds: 300),
-            labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-            destinations: [
-              const NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: 'Home',
-              ),
-              NavigationDestination(
-                icon: Badge.count(
-                  count: totalActiveCount,
-                  isLabelVisible: totalActiveCount > 0,
-                  child: const Icon(Icons.file_download_outlined),
-                ),
-                selectedIcon: Badge.count(
-                  count: totalActiveCount,
-                  isLabelVisible: totalActiveCount > 0,
-                  child: const Icon(Icons.file_download),
-                ),
-                label: 'Task',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.history_outlined),
-                selectedIcon: Icon(Icons.history),
-                label: 'History',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.cloud_upload_outlined),
-                selectedIcon: Icon(Icons.cloud_upload),
-                label: 'Upload',
-              ),
-              const NavigationDestination(
-                icon: Icon(Icons.settings_outlined),
-                selectedIcon: Icon(Icons.settings),
-                label: 'Settings',
-              ),
-            ],
           ),
         );
       },

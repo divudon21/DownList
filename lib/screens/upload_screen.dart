@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../models/task_model.dart';
 import '../services/api_service.dart';
 import '../services/upload_manager.dart';
+import '../widgets/settings_components.dart';
 import '../widgets/upload_item_card.dart';
 
 class UploadScreen extends StatelessWidget {
@@ -47,45 +48,33 @@ class UploadScreen extends StatelessWidget {
         final batchProgress =
             totalBytes > 0 ? (uploadedBytes / totalBytes).clamp(0.0, 1.0) : 0.0;
 
-        return CustomScrollView(
-          slivers: [
+        return ColoredBox(
+          color: colorScheme.surfaceContainer,
+          child: CustomScrollView(
+            slivers: [
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               sliver: SliverToBoxAdapter(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'Upload Files',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Select one or multiple files to upload directly to your server.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+                    const SettingsSectionTitle('FILE UPLOADS'),
                     if (!api.isConfigured) ...[
                       _buildServerBanner(context),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
                     ],
-                    _buildControlCard(
-                      context: context,
-                      totalCount: items.length,
-                      readyCount: readyCount,
-                      activeCount: activeCount,
-                      completedCount: completedCount,
-                      totalBytes: totalBytes,
-                      uploadedBytes: uploadedBytes,
-                      batchProgress: batchProgress,
-                    ),
+                    SettingsGroup(children: [
+                      _buildControlCard(
+                        context: context,
+                        totalCount: items.length,
+                        readyCount: readyCount,
+                        activeCount: activeCount,
+                        completedCount: completedCount,
+                        totalBytes: totalBytes,
+                        uploadedBytes: uploadedBytes,
+                        batchProgress: batchProgress,
+                      ),
+                    ]),
                     const SizedBox(height: 12),
                   ],
                 ),
@@ -121,6 +110,7 @@ class UploadScreen extends StatelessWidget {
               const SliverToBoxAdapter(child: SizedBox(height: 28)),
             ],
           ],
+          ),
         );
       },
     );
@@ -172,13 +162,9 @@ class UploadScreen extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final speed = uploadManager.combinedSpeed;
 
-    return Card(
-      elevation: 0,
-      color: colorScheme.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
+    return Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
@@ -283,7 +269,6 @@ class UploadScreen extends StatelessWidget {
               ],
             ],
           ],
-        ),
       ),
     );
   }

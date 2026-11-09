@@ -45,6 +45,11 @@ def main() -> int:
         if err_lines:
             summary = "\n".join(err_lines[-40:])[:3500]
             print(f"::error title=CompilerOrGradleErrors::{escape_gha(summary)}", flush=True)
+        for index, line in enumerate(lines):
+            if "EXCEPTION CAUGHT BY WIDGETS LIBRARY" in line:
+                detail = "\n".join(lines[index:index + 25])[:3500]
+                print(f"::error title=WidgetException::{escape_gha(detail)}", flush=True)
+                break
         tail = "\n".join(lines[-60:])[:3500]
         print(f"::error title=BuildLogTail::{escape_gha(tail)}", flush=True)
     return rc

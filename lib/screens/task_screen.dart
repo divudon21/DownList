@@ -6,6 +6,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../models/task_model.dart';
 import '../services/api_service.dart';
 import '../services/upload_manager.dart';
+import '../widgets/settings_components.dart';
 import '../widgets/task_card.dart';
 import '../widgets/upload_item_card.dart';
 
@@ -156,41 +157,42 @@ class _TaskScreenState extends State<TaskScreen> {
 
     final hasNothingActive = activeUploads.isEmpty && activeDownloads.isEmpty;
 
-    return RefreshIndicator(
-      onRefresh: () => _load(manualRefresh: true),
-      child: CustomScrollView(
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainer,
+      child: RefreshIndicator(
+        onRefresh: () => _load(manualRefresh: true),
+        child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
             sliver: SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Active Tasks',
-                    style: TextStyle(
-                      fontSize: 26,
+              child: SettingsGroup(children: [
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 5),
+                  leading: CircleAvatar(
+                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                    child: const Icon(Icons.sync_rounded),
+                  ),
+                  title: const Text('Transfers in progress', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text('${activeDownloads.length} downloads · ${activeUploads.length} uploads'),
+                  trailing: Text(
+                    '${activeDownloads.length + activeUploads.length}',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Live server downloads and active file uploads.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  if (_error != null && widget.api.isConfigured) ...[
-                    const SizedBox(height: 10),
-                    _errorBanner(_error!),
-                  ],
-                ],
-              ),
+                ),
+              ]),
             ),
           ),
+          if (_error != null && widget.api.isConfigured)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              sliver: SliverToBoxAdapter(child: _errorBanner(_error!)),
+            ),
           if (!widget.api.isConfigured && activeUploads.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
@@ -290,6 +292,7 @@ class _TaskScreenState extends State<TaskScreen> {
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         ],
+        ),
       ),
     );
   }

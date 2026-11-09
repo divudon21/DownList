@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../models/task_model.dart';
 import '../services/api_service.dart';
 import '../widgets/history_card.dart';
+import '../widgets/settings_components.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({
@@ -95,43 +96,42 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: () => _load(showSpinner: _tasks.isEmpty),
-      child: CustomScrollView(
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainer,
+      child: RefreshIndicator(
+        onRefresh: () => _load(showSpinner: _tasks.isEmpty),
+        child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
             sliver: SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'History',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
-                    ),
+              child: SettingsGroup(children: [
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 5),
+                  leading: CircleAvatar(
+                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                    child: const Icon(Icons.history_rounded),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Completed and failed downloads & uploads on your server.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  if (_tasks.isNotEmpty)
-                    TextButton.icon(onPressed: _clearAll, icon: const Icon(Icons.delete_sweep_outlined), label: const Text('Clear all server files')),
-                  if (_error != null && widget.api.isConfigured) ...[
-                    const SizedBox(height: 10),
-                    _errorBanner(_error!),
-                  ],
-                ],
-              ),
+                  title: const Text('Transfer history', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text('${_tasks.length} completed or failed transfers'),
+                  trailing: _tasks.isEmpty
+                      ? Text('${_tasks.length}', style: Theme.of(context).textTheme.titleMedium)
+                      : IconButton.filledTonal(
+                          tooltip: 'Clear all server files',
+                          onPressed: _clearAll,
+                          icon: const Icon(Icons.delete_sweep_outlined),
+                        ),
+                ),
+              ]),
             ),
           ),
+          if (_error != null && widget.api.isConfigured)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              sliver: SliverToBoxAdapter(child: _errorBanner(_error!)),
+            ),
           if (!widget.api.isConfigured)
             SliverFillRemaining(
               hasScrollBody: false,
@@ -167,6 +167,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         ],
+        ),
       ),
     );
   }
