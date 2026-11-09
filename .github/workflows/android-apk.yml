@@ -143,7 +143,9 @@ jobs:
           echo "::notice::Using Android build tools at $TOOLS"
           AAPT="$(dirname "$TOOLS")/aapt"
           test -x "$AAPT"
-          SIGNER=$("$TOOLS" verify --print-certs release-apks/DownList-universal.apk | awk -F ': ' '/Signer #1 certificate SHA-256 digest:/ && !seen++ {print $2}')
+          CERT_INFO=$("$TOOLS" verify --print-certs release-apks/DownList-universal.apk)
+          echo "::notice::Certificate info $(echo "$CERT_INFO" | tr '\n' ';')"
+          SIGNER=$(printf '%s\n' "$CERT_INFO" | sed -n 's/.*certificate SHA-256 digest: *//p' | sed -n '1p')
           echo "::notice::Signing fingerprint length: ${#SIGNER}"
           test "${#SIGNER}" -eq 64
           for apk in release-apks/*.apk; do
@@ -151,7 +153,7 @@ jobs:
             echo "::notice::$BADGING"
             [[ "$BADGING" == *"name='com.dowlist.com'"* ]]
             [[ "$BADGING" == *"versionCode='$GITHUB_RUN_NUMBER'"* ]]
-            ACTUAL=$("$TOOLS" verify --print-certs "$apk" | awk -F ': ' '/Signer #1 certificate SHA-256 digest:/ && !seen++ {print $2}')
+            ACTUAL=$("$TOOLS" verify --print-certs "$apk" | sed -n 's/.*certificate SHA-256 digest: *//p' | sed -n '1p')
             test "$SIGNER" = "$ACTUAL"
           done
           VERSION_NAME=$("$AAPT" dump badging release-apks/DownList-universal.apk | sed -n '1p' | sed -n "s/.*versionName='\([^']*\)'.*/\1/p")
