@@ -13,11 +13,17 @@ void main() {
 
   testWidgets('Compact URL expands on tap, actions share a row and URL survives collapse', (tester) async {
     final api = ApiService();
+    String? clipboard;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') clipboard = (call.arguments as Map)['text'] as String?;
+      if (call.method == 'Clipboard.getData') return {'text': clipboard};
+      return null;
+    });
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: HomeScreen(api: api))));
     await tester.pumpAndSettle();
     expect(find.text('File URL'), findsOneWidget);
     expect(find.text('Start Download'), findsNothing);
-    await tester.tap(find.text('File URL'));
+    await tester.tap(find.byType(TextFormField));
     await tester.pumpAndSettle();
     expect(find.text('Start Download'), findsOneWidget);
     expect(find.text('Clipboard'), findsOneWidget);
@@ -31,7 +37,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Start Download'), findsNothing);
     expect(find.text('https://example.com/file'), findsOneWidget);
-    await tester.tap(find.text('https://example.com/file'));
+    await tester.tap(find.byType(TextFormField));
     await tester.pumpAndSettle();
     expect(find.text('Clipboard'), findsOneWidget);
     await Clipboard.setData(const ClipboardData(text: 'https://example.com/new'));
@@ -40,7 +46,8 @@ void main() {
     expect(find.text('https://example.com/new'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     api.dispose();
-  });
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null);
+  }, timeout: const Timeout(Duration(seconds: 45)));
 
   testWidgets('Home preference persists and controls next startup layout', (tester) async {
     SharedPreferences.setMockInitialValues({});

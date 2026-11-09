@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:ai_agent_downloader/main.dart';
@@ -26,7 +26,7 @@ void main() {
     expect(find.text('DownList'), findsOneWidget);
     expect(find.text('Remote Download'), findsOneWidget);
     expect(find.text('GoFile'), findsNothing);
-    await tester.tap(find.text('File URL'));
+    await tester.tap(find.byType(TextFormField));
     await tester.pumpAndSettle();
     expect(find.text('GoFile'), findsOneWidget);
     expect(find.text('Clipboard'), findsOneWidget);
