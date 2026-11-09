@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate Android launcher resources from the checked-in app logo (requires Pillow)."""
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image, ImageChops, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
 RES = ROOT / 'android/app/src/main/res'
@@ -12,16 +12,18 @@ if source.width != source.height:
 # Adaptive icons use a 108 dp canvas with a 72 dp safe region. Keep the symbol
 # inset so that circular, squircle and other launcher masks do not crop it.
 foreground = Image.new('RGBA', (source.width, source.height), (0, 0, 0, 0))
-size = round(source.width * .80)
+size = round(source.width * .76)
 image = source.resize((size, size), Image.Resampling.LANCZOS).convert('RGBA')
 pos = (source.width - size) // 2
 foreground.alpha_composite(image, (pos, pos))
 
-# The monochrome layer is derived from the green mark, excluding the near-black
+# Retain all hues in the monochrome layer, excluding the near-black
 # background and facial cut-outs, for Android's themed icons.
-green = source.getchannel('G').point(lambda value: max(0, min(255, round((value - 60) * 255 / 70))))
+r, g, b = source.split()
+brightness = ImageChops.lighter(ImageChops.lighter(r, g), b)
+mask = brightness.point(lambda value: max(0, min(255, round((value - 40) * 255 / 60))))
 mono_image = Image.new('RGBA', source.size, 'white')
-mono_image.putalpha(green)
+mono_image.putalpha(mask)
 mono = Image.new('RGBA', source.size, (0, 0, 0, 0))
 mono.alpha_composite(mono_image.resize((size, size), Image.Resampling.LANCZOS), (pos, pos))
 
