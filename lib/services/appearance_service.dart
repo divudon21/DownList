@@ -40,6 +40,7 @@ const appFonts = <AppFont>[
   AppFont('nunito', 'Nunito', 'Nunito', 'Soft and rounded'),
   AppFont('lato', 'Lato', 'Lato', 'Friendly and balanced'),
   AppFont('jetbrains', 'JetBrains Mono', 'JetBrainsMono', 'Distinctive monospace'),
+  AppFont('manrope', 'Manrope', 'Manrope', 'Crisp, modern and easy to read'),
 ];
 
 class AppearanceService extends ChangeNotifier {

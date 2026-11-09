@@ -21,7 +21,7 @@ import 'services/update_service.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   LicenseRegistry.addLicense(() async* {
-    for (final family in ['Inter', 'Nunito', 'Lato', 'JetBrainsMono']) {
+    for (final family in ['Inter', 'Nunito', 'Lato', 'JetBrainsMono', 'Manrope']) {
       final license = await rootBundle.loadString('assets/fonts/$family/OFL.txt');
       yield LicenseEntryWithLineBreaks([family], license);
     }

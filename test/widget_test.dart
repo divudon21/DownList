@@ -55,6 +55,10 @@ void main() {
         find.descendant(of: find.byType(AppBar), matching: find.text(tab.$1)),
         findsOneWidget,
       );
+      if (tab.$1 == 'Upload') {
+        expect(find.text('FILE UPLOADS'), findsOneWidget);
+        expect(find.text('Upload Files'), findsNothing);
+      }
     }
     expect(find.descendant(of: find.byType(AppBar), matching: find.text('Home')), findsOneWidget);
     expect(find.text('GoFile'), findsNothing);

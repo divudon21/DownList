@@ -1,7 +1,7 @@
 name: ai_agent_downloader
 description: DownList — Material 3 client for remote downloads, multi-file uploads, and external video player streaming.
 publish_to: 'none'
-version: 1.2.8+11
+version: 1.2.9+12
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -29,6 +29,7 @@ flutter:
     - assets/fonts/Nunito/OFL.txt
     - assets/fonts/Lato/OFL.txt
     - assets/fonts/JetBrainsMono/OFL.txt
+    - assets/fonts/Manrope/OFL.txt
   fonts:
     - family: Inter
       fonts:
@@ -44,3 +45,6 @@ flutter:
     - family: JetBrainsMono
       fonts:
         - asset: assets/fonts/JetBrainsMono/JetBrainsMono.ttf
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope/Manrope.ttf

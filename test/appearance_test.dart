@@ -34,7 +34,19 @@ void main() {
     restored.dispose();
   });
 
-  test('All 15 accents and five text choices are present', () async {
+  test('Manrope selection persists and applies app-wide', () async {
+    SharedPreferences.setMockInitialValues({});
+    final appearance = AppearanceService();
+    await appearance.setFont(appFonts.singleWhere((font) => font.id == 'manrope'));
+    final restored = AppearanceService();
+    await restored.initialize();
+    expect(restored.font.id, 'manrope');
+    expect(restored.theme(Brightness.light).textTheme.bodyMedium!.fontFamily, 'Manrope');
+    appearance.dispose();
+    restored.dispose();
+  });
+
+  test('All 15 accents and six text choices are present', () async {
     SharedPreferences.setMockInitialValues({});
     final appearance = AppearanceService();
     final light = <Color>{};
@@ -47,7 +59,8 @@ void main() {
     expect(appAccents.length, 15);
     expect(light.length, 15);
     expect(dark.length, 15);
-    expect(appFonts.length, 5);
+    expect(appFonts.length, 6);
+    expect(appFonts.last.id, 'manrope');
     expect(appFonts.first.family, isNull);
     appearance.dispose();
   });
@@ -102,6 +115,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(appearance.font.id, 'nunito');
     expect(Theme.of(tester.element(find.text('App theme'))).textTheme.bodyMedium!.fontFamily, 'Nunito');
+    await tester.ensureVisible(find.byKey(const ValueKey('font-manrope')));
+    await tester.tap(find.byKey(const ValueKey('font-manrope')));
+    await tester.pumpAndSettle();
+    expect(appearance.font.id, 'manrope');
+    expect(Theme.of(tester.element(find.text('App theme'))).textTheme.bodyMedium!.fontFamily, 'Manrope');
     await tester.ensureVisible(find.text('App theme'));
     await tester.ensureVisible(find.byKey(const ValueKey('theme-light')));
     await tester.tap(find.byKey(const ValueKey('theme-light')));
