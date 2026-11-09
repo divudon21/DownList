@@ -169,21 +169,12 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/arena/203aad4c-ok-ai'
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_CHANNEL: ${{ inputs.release_channel || 'stable' }}
         run: |
           set -euo pipefail
-          RELEASE_TARGET="${GITHUB_SHA}"
-          if [ "$GITHUB_REF" != refs/heads/main ]; then
-            git fetch origin main
-            RELEASE_TARGET=$(git rev-parse FETCH_HEAD)
-            if ! git diff --quiet "$RELEASE_TARGET" HEAD -- . ':(exclude).github/workflows/android-apk.yml'; then
-              echo '::error::Branch app content differs from merged main; refusing to release.'
-              exit 1
-            fi
-          fi
           TAG="v1.0.${GITHUB_RUN_NUMBER}"
           TITLE="DownList ${APP_VERSION_NAME} (build ${GITHUB_RUN_NUMBER})"
           METADATA=$(python3 -c 'import json,os; print(json.dumps({"packageName":"com.dowlist.com","versionName":os.environ["APP_VERSION_NAME"],"versionCode":int(os.environ["GITHUB_RUN_NUMBER"]),"signerSha256":os.environ["APP_SIGNER_SHA256"]},separators=(",",":")))')
@@ -199,7 +190,7 @@ jobs:
 
           ${SIGNING_NOTE}
 
-          Signed release APKs built from the app content of commit \`${RELEASE_TARGET}\`.
+          Signed release APKs built automatically from commit \`${GITHUB_SHA}\`.
 
           ### Which APK should I install?
           - **\`DownList-arm64-v8a.apk\`** *(Recommended)* — Modern 64-bit Android phones & tablets.
@@ -221,6 +212,6 @@ jobs:
           if [ "$RELEASE_CHANNEL" = beta ]; then PRERELEASE=(--prerelease); fi
           gh release create "$TAG" \
             release-apks/*.apk release-apks/SHA256SUMS.txt \
-            --target "${RELEASE_TARGET}" \
+            --target "${GITHUB_SHA}" \
             --title "$TITLE" \
             --notes-file /tmp/release_notes.md "${PRERELEASE[@]}"
