@@ -276,6 +276,26 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ),
         );
 
+        final glassNavigation = LiquidGlassNavBar(
+          key: const ValueKey('bottom-navigation'),
+          items: navItems,
+          selectedIndex: _selectedIndex,
+          onTap: _selectTab,
+          activeColor: Theme.of(context).colorScheme.primary,
+          inactiveColor: Theme.of(context).colorScheme.onSurfaceVariant,
+          labelStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.1,
+          ),
+          iconSize: 22,
+          insets: 14,
+          borderRadius: 30,
+          dragRainbowBorder: true,
+          liquidActiveBubble: true,
+          impellerSupported: widget.impellerSupported,
+        );
+
         return Scaffold(
           extendBody: true,
           appBar: AppBar(
@@ -340,25 +360,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     ),
                   );
                 }),
-                LiquidGlassNavBar(
-                  key: const ValueKey('bottom-navigation'),
-                  items: navItems,
-                  selectedIndex: _selectedIndex,
-                  onTap: _selectTab,
-                  activeColor: Theme.of(context).colorScheme.primary,
-                  inactiveColor: Theme.of(context).colorScheme.onSurfaceVariant,
-                  labelStyle: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.1,
-                  ),
-                  iconSize: 22,
-                  insets: 14,
-                  borderRadius: 30,
-                  dragRainbowBorder: true,
-                  liquidActiveBubble: true,
-                  impellerSupported: widget.impellerSupported,
-                ),
+                widget.impellerSupported
+                    ? glassNavigation
+                    : Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: glassNavigation,
+                      ),
               ],
             ),
           ),
