@@ -13,5 +13,7 @@ void main() {
 
     expect(find.text('DownList'), findsOneWidget);
     expect(find.text('Remote Download'), findsOneWidget);
+    expect(find.text('Upload to GoFile'), findsOneWidget);
+    expect(find.byTooltip('Server Info'), findsOneWidget);
   });
 }

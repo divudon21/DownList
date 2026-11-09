@@ -84,6 +84,9 @@ jobs:
       - name: Static analysis check
         run: python3 scripts/run_with_annotations.py flutter analyze --no-fatal-infos --no-fatal-warnings
 
+      - name: Flutter tests
+        run: python3 scripts/run_with_annotations.py flutter test
+
       - name: Build split-per-ABI release APKs
         run: python3 scripts/run_with_annotations.py flutter build apk --release --split-per-abi
 

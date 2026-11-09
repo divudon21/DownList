@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+
+import 'widgets/server_info_sheet.dart';
 
 import 'screens/history_screen.dart';
 import 'screens/home_screen.dart';
@@ -174,6 +177,13 @@ class _HomePageState extends State<HomePage> {
               ],
             ),
             centerTitle: false,
+            actions: _selectedIndex == 0 ? [
+              IconButton(
+                tooltip: 'Server Info',
+                onPressed: () => showModalBottomSheet<void>(context: context, isScrollControlled: true, builder: (_) => ServerInfoSheet(api: widget.api)),
+                icon: const Icon(Icons.info_outline_rounded),
+              ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.8, 0.8)),
+            ] : null,
           ),
           body: SafeArea(
             child: IndexedStack(

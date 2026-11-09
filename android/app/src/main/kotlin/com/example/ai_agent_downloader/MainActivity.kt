@@ -100,6 +100,17 @@ class MainActivity : FlutterActivity() {
                 "getMediaPlayers" -> handleGetMediaPlayers(call, result)
                 "launchMediaPlayer" -> handleLaunchMediaPlayer(call, result)
                 "openExternalPlayer" -> handleOpenExternalPlayer(call, result)
+                "openUrl" -> {
+                    try {
+                        val url = call.argument<String>("url") ?: ""
+                        val uri = Uri.parse(url)
+                        require(uri.scheme == "https" || uri.scheme == "http")
+                        startActivity(Intent(Intent.ACTION_VIEW, uri))
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("OPEN_URL_FAILED", "Unable to open link.", null)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }

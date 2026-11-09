@@ -101,7 +101,7 @@ class TaskCard extends StatelessWidget {
                 Expanded(
                   child: _stat(
                     context,
-                    'Downloaded',
+                    task.status == 'uploading_to_gofile' ? 'Uploaded' : 'Downloaded',
                     task.downloadedFormatted,
                     Icons.done_outline,
                   ),
@@ -158,6 +158,13 @@ class TaskCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (task.isActive) TextButton.icon(
+                  onPressed: () async {
+                    try { await api.cancelTask(task.taskId); onRefresh?.call(); }
+                    catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); }
+                  },
+                  icon: const Icon(Icons.cancel_outlined), label: const Text('Cancel'),
+                ),
                 OutlinedButton.icon(
                   onPressed: () async {
                     if (onRefresh != null) {

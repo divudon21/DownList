@@ -178,6 +178,10 @@ class PlatformService {
     });
   }
 
+  Future<void> openUrl(String url) async {
+    await _channel.invokeMethod<bool>('openUrl', {'url': url});
+  }
+
   static String guessMediaMimeType(String extension, {bool isAudio = false}) {
     switch (extension.toLowerCase()) {
       case 'mp4':

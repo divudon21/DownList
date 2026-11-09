@@ -140,6 +140,40 @@ class ApiService extends ChangeNotifier {
     throw Exception('Server responded with HTTP ${response.statusCode}.');
   }
 
+  Future<Map<String, dynamic>> _request(String method, String path, [Map<String, dynamic>? body]) async {
+    if (!isConfigured) throw Exception('Please configure the server URL in Settings.');
+    final uri = _uri(path);
+    final response = method == 'GET'
+        ? await http.get(uri).timeout(const Duration(seconds: 30))
+        : method == 'DELETE'
+            ? await http.delete(uri).timeout(const Duration(seconds: 30))
+            : await http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body ?? {})).timeout(const Duration(seconds: 30));
+    Map<String, dynamic> data;
+    try { data = Map<String, dynamic>.from(jsonDecode(response.body) as Map); }
+    catch (_) { throw Exception('Invalid server response (HTTP ${response.statusCode}).'); }
+    if (response.statusCode < 200 || response.statusCode >= 300 || data['error'] != null) {
+      throw Exception(data['error']?.toString() ?? data['detail']?.toString() ?? 'Server error (HTTP ${response.statusCode}).');
+    }
+    return data;
+  }
+
+  Future<String> startGofileTransfer(String url) async {
+    final data = await _request('POST', '/start_gofile_transfer', {'url': url.trim()});
+    final id = data['task_id']?.toString() ?? '';
+    if (id.isEmpty) throw Exception('Server did not return a task ID.');
+    _sessionTaskIds.add(id);
+    notifyListeners();
+    return id;
+  }
+
+  Future<void> deleteTask(String id) async { await _request('DELETE', '/delete/$id'); notifyHistoryChanged(); }
+  Future<void> renameTask(String id, String name) async { await _request('POST', '/rename/$id', {'new_name': name}); notifyHistoryChanged(); }
+  Future<void> cancelTask(String id) async { await _request('POST', '/cancel/$id'); notifyHistoryChanged(); }
+  Future<void> deleteAllTasks() async { await _request('POST', '/delete_all'); notifyHistoryChanged(); }
+  Future<Map<String, dynamic>> getFileInfo(String id) => _request('GET', '/file_info/$id');
+  Future<Map<String, dynamic>> listZipContents(String id) => _request('GET', '/list_zip/$id');
+  Future<void> extractZip(String id) async { await _request('POST', '/extract_zip/$id'); notifyHistoryChanged(); }
+
   String get uploadEndpoint => '$_baseUrl/upload';
 
   String downloadUrl(String taskId) => '$_baseUrl/download/$taskId';

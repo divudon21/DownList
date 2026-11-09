@@ -127,6 +127,13 @@ class HistoryCard extends StatelessWidget {
                 onDelete: () => _delete(context),
                 onRename: () => _rename(context),
               ),
+              if (task.hasGofileUrl) ...[
+                const SizedBox(height: 8),
+                SelectableText('GoFile: ${task.gofileUrl}'),
+                TextButton.icon(onPressed: () async { try { await PlatformService.instance.openUrl(task.gofileUrl!); } catch (_) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unable to open link'))); } }, icon: const Icon(Icons.open_in_new), label: const Text('Open GoFile')),
+              ],
+              if (task.isZip && task.isCompleted && !task.localDeleted)
+                TextButton.icon(onPressed: () => _showZip(context), icon: const Icon(Icons.folder_zip_outlined), label: const Text('ZIP contents')),
               if (task.totalSize > 0) ...[
                 const SizedBox(height: 14),
                 ClipRRect(
@@ -296,15 +303,18 @@ class HistoryCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              _infoRow(
-                dialogContext,
-                'Resolution',
-                'Not available (server exposes no media-metadata endpoint)',
-              ),
-              _infoRow(
-                dialogContext,
-                'Bitrate',
-                'Not available (server exposes no media-metadata endpoint)',
+              FutureBuilder<Map<String, dynamic>>(
+                future: api.getFileInfo(task.taskId),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return Text(snapshot.hasError ? 'Media details unavailable' : 'Loading media details…');
+                  final info = snapshot.data!['media_info'];
+                  if (info is! Map || info.isEmpty) return const Text('Media details unavailable for this file.');
+                  return Column(children: [
+                    _infoRow(context, 'Resolution', '${info['resolution'] ?? 'Unavailable'}'),
+                    _infoRow(context, 'Duration', info['duration_seconds'] == null ? 'Unavailable' : '${info['duration_seconds']} seconds'),
+                    _infoRow(context, 'Bitrate', info['bitrate_bps'] == null ? 'Unavailable' : '${info['bitrate_bps']} bps'),
+                  ]);
+                },
               ),
               if (task.isVideo || task.isAudio)
                 _infoRow(
@@ -363,7 +373,7 @@ class HistoryCard extends StatelessWidget {
   }
 
   Future<void> _copyLink(BuildContext context) async {
-    final url = api.downloadUrl(task.taskId);
+    final url = task.gofileUrl ?? api.downloadUrl(task.taskId);
     await Clipboard.setData(ClipboardData(text: url));
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -376,7 +386,7 @@ class HistoryCard extends StatelessWidget {
   }
 
   Future<void> _streamInPlayer(BuildContext context) async {
-    if (!task.isCompleted) {
+    if (!task.isCompleted || task.localDeleted || !(task.isVideo || task.isAudio)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('File is not ready for streaming.')),
       );
@@ -398,42 +408,39 @@ class HistoryCard extends StatelessWidget {
   }
 
   Future<void> _delete(BuildContext context) async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete not supported'),
-        content: const Text(
-          'The server does not expose a single-file delete endpoint, so '
-          'individual file deletion cannot be performed server-side.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+    final confirmed = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Delete file?'), content: Text('Delete ${task.fileName} and its server history? A GoFile copy is not deleted.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete'))],
+    ));
+    if (confirmed != true || !context.mounted) return;
+    try { await api.deleteTask(task.taskId); } catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); }
   }
 
   Future<void> _rename(BuildContext context) async {
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Rename not supported'),
-        content: const Text(
-          'The server does not expose a rename endpoint, so server-side '
-          'renaming cannot be performed.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+    final controller = TextEditingController(text: task.fileName);
+    final name = await showDialog<String>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Rename file'), content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(labelText: 'Filename')),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Rename'))],
+    ));
+    controller.dispose();
+    if (name == null || name.isEmpty || !context.mounted) return;
+    try { await api.renameTask(task.taskId, name); } catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); }
   }
+
+  Future<void> _showZip(BuildContext context) async {
+    try {
+      final result = await api.listZipContents(task.taskId);
+      if (!context.mounted) return;
+      final entries = (result['files'] as List? ?? []).whereType<Map>().toList();
+      final extract = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+        title: Text('ZIP contents (${entries.length})'),
+        content: SizedBox(width: double.maxFinite, child: entries.isEmpty ? const Text('Archive is empty') : ListView.builder(shrinkWrap: true, itemCount: entries.length, itemBuilder: (_, i) => ListTile(dense: true, title: Text('${entries[i]['filename']}'), subtitle: Text(TaskModel.formatBytes((entries[i]['file_size'] as num?)?.toInt() ?? 0))))),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Close')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Extract'))],
+      ));
+      if (extract == true) { await api.extractZip(task.taskId); if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Extraction started. See Tasks for progress.'))); }
+    } catch (e) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()))); }
+  }
+
 }
 
 class _ActionButtons extends StatelessWidget {
