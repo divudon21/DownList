@@ -65,6 +65,11 @@ void main() {
         home: AppearanceSettingsScreen(appearance: appearance),
       ),
     ));
+    for (final tile in tester.widgetList<ExpansionTile>(find.byType(ExpansionTile))) {
+      expect(tile.shape, const Border());
+      expect(tile.collapsedShape, const Border());
+    }
+    expect(find.byKey(const ValueKey('theme-dark')), findsNothing);
     expect(find.text('Teal'), findsNothing);
     expect(find.text('Nunito'), findsNothing);
     final toggle = find.byType(SwitchListTile);
@@ -74,13 +79,14 @@ void main() {
     expect(appearance.highContrastDark, isFalse);
     await tester.tap(find.text('App theme'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Dark'));
+    await tester.tap(find.byKey(const ValueKey('theme-dark')));
     await tester.pumpAndSettle();
     expect(tester.widget<SwitchListTile>(toggle).onChanged, isNotNull);
     await tester.tap(find.text('High contrast dark theme'));
     await tester.pumpAndSettle();
     expect(Theme.of(tester.element(find.text('App theme'))).colorScheme.surface, Colors.black);
     final oldColor = Theme.of(tester.element(find.text('App theme'))).colorScheme.primary;
+    await tester.ensureVisible(find.text('App colour'));
     await tester.tap(find.text('App colour'));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Teal'));
@@ -97,9 +103,8 @@ void main() {
     expect(appearance.font.id, 'nunito');
     expect(Theme.of(tester.element(find.text('App theme'))).textTheme.bodyMedium!.fontFamily, 'Nunito');
     await tester.ensureVisible(find.text('App theme'));
-    await tester.tap(find.text('App theme'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Light'));
+    await tester.ensureVisible(find.byKey(const ValueKey('theme-light')));
+    await tester.tap(find.byKey(const ValueKey('theme-light')));
     await tester.pumpAndSettle();
     expect(tester.widget<SwitchListTile>(toggle).onChanged, isNull);
     expect(appearance.highContrastDark, isTrue); // Restored when dark mode becomes active again.

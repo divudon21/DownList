@@ -25,7 +25,11 @@ void main() {
 
     expect(find.text('DownList'), findsOneWidget);
     expect(find.text('Remote Download'), findsOneWidget);
-    expect(find.text('Upload to GoFile'), findsOneWidget);
+    expect(find.text('GoFile'), findsNothing);
+    await tester.tap(find.text('File URL'));
+    await tester.pumpAndSettle();
+    expect(find.text('GoFile'), findsOneWidget);
+    expect(find.text('Clipboard'), findsOneWidget);
     expect(find.byTooltip('Server Info'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);

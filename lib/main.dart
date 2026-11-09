@@ -42,6 +42,7 @@ class _AiAgentAppState extends State<AiAgentApp> {
   late final UpdateService _updates;
   late final AppearanceService _appearance;
   bool _ready = false;
+  bool _homeExpandedOnStart = false;
 
   @override
   void initState() {
@@ -61,6 +62,7 @@ class _AiAgentAppState extends State<AiAgentApp> {
     await _api.restoreMonitoredTasks();
     await _updates.initialize();
     await _appearance.initialize();
+    _homeExpandedOnStart = await _settings.getHomeExpandedOnStart();
     if (!mounted) return;
     setState(() {
       _ready = true;
@@ -97,6 +99,7 @@ class _AiAgentAppState extends State<AiAgentApp> {
               uploadManager: _uploadManager,
               updates: _updates,
               appearance: _appearance,
+              homeExpandedOnStart: _homeExpandedOnStart,
             )
           : const Scaffold(
               body: Center(child: CircularProgressIndicator()),
@@ -114,6 +117,7 @@ class HomePage extends StatefulWidget {
     required this.uploadManager,
     required this.updates,
     required this.appearance,
+    required this.homeExpandedOnStart,
   });
 
   final SettingsService settings;
@@ -121,6 +125,7 @@ class HomePage extends StatefulWidget {
   final UploadManager uploadManager;
   final UpdateService updates;
   final AppearanceService appearance;
+  final bool homeExpandedOnStart;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -202,6 +207,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final pages = <Widget>[
           HomeScreen(
             api: widget.api,
+            initiallyExpanded: widget.homeExpandedOnStart,
             onViewTasks: () => _selectTab(1),
             onOpenSettings: () => _selectTab(4),
           ),

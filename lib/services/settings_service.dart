@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsService {
   static const String _keyServerUrl = 'server_url';
+  static const String _keyHomeExpanded = 'home_expanded_on_start';
   static const String _keyNotificationAsked = 'notification_permission_asked';
 
   late final Future<SharedPreferences> _prefs =
@@ -9,6 +10,9 @@ class SettingsService {
 
   Future<bool> notificationPermissionAsked() async => (await _prefs).getBool(_keyNotificationAsked) ?? false;
   Future<void> markNotificationPermissionAsked() async { await (await _prefs).setBool(_keyNotificationAsked, true); }
+
+  Future<bool> getHomeExpandedOnStart() async => (await _prefs).getBool(_keyHomeExpanded) ?? false;
+  Future<void> setHomeExpandedOnStart(bool value) async { await (await _prefs).setBool(_keyHomeExpanded, value); }
 
   Future<String> getServerUrl() async {
     final prefs = await _prefs;

@@ -13,28 +13,6 @@ class AppearanceSettingsScreen extends StatelessWidget {
     ThemeMode.dark => 'Dark',
   };
 
-  Future<void> _chooseTheme(BuildContext context) async {
-    final selected = await showDialog<ThemeMode>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('App theme'),
-        contentPadding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          for (final mode in ThemeMode.values)
-            ListTile(
-              title: Text(_themeLabel(mode)),
-              leading: Icon(mode == ThemeMode.system ? Icons.brightness_auto_outlined : mode == ThemeMode.light ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
-              trailing: appearance.themeMode == mode ? Icon(Icons.check_rounded, color: Theme.of(context).colorScheme.primary) : null,
-              selected: appearance.themeMode == mode,
-              onTap: () => Navigator.pop(context, mode),
-            ),
-        ]),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel'))],
-      ),
-    );
-    if (selected != null) await appearance.setThemeMode(selected);
-  }
-
   @override
   Widget build(BuildContext context) => ListenableBuilder(
     listenable: appearance,
@@ -44,11 +22,25 @@ class AppearanceSettingsScreen extends StatelessWidget {
       return SettingsPage(title: 'Appearance', child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const SettingsSectionTitle('Theme'),
         SettingsGroup(children: [
-          SettingsRow(
-            icon: Icons.brightness_6_outlined,
-            title: 'App theme',
-            subtitle: _themeLabel(appearance.themeMode),
-            onTap: () => _chooseTheme(context),
+          ExpansionTile(
+            key: const PageStorageKey('appearance-theme'),
+            shape: const Border(),
+            collapsedShape: const Border(),
+            leading: Icon(Icons.brightness_6_outlined, color: colors.onSurfaceVariant),
+            title: const Text('App theme', style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(_themeLabel(appearance.themeMode)),
+            childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            children: [
+              for (final mode in ThemeMode.values)
+                ListTile(
+                  key: ValueKey('theme-${mode.name}'),
+                  leading: Icon(mode == ThemeMode.system ? Icons.brightness_auto_outlined : mode == ThemeMode.light ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+                  title: Text(_themeLabel(mode)),
+                  trailing: appearance.themeMode == mode ? Icon(Icons.check_circle_rounded, color: colors.primary) : null,
+                  selected: appearance.themeMode == mode,
+                  onTap: () => appearance.setThemeMode(mode),
+                ),
+            ],
           ),
           SwitchListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 5),
@@ -64,6 +56,8 @@ class AppearanceSettingsScreen extends StatelessWidget {
         SettingsGroup(children: [
           ExpansionTile(
             key: const PageStorageKey('appearance-colours'),
+            shape: const Border(),
+            collapsedShape: const Border(),
             leading: Icon(Icons.palette_outlined, color: colors.onSurfaceVariant),
             title: const Text('App colour', style: TextStyle(fontWeight: FontWeight.w600)),
             subtitle: Text('${appearance.accent.name} · ${appAccents.length} colours'),
@@ -105,6 +99,8 @@ class AppearanceSettingsScreen extends StatelessWidget {
           ),
           ExpansionTile(
             key: const PageStorageKey('appearance-fonts'),
+            shape: const Border(),
+            collapsedShape: const Border(),
             leading: Icon(Icons.text_fields_rounded, color: colors.onSurfaceVariant),
             title: const Text('App text', style: TextStyle(fontWeight: FontWeight.w600)),
             subtitle: Text(appearance.font.name),

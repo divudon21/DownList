@@ -8,6 +8,7 @@ import '../widgets/settings_components.dart';
 import 'settings/about_settings_screen.dart';
 import 'settings/appearance_settings_screen.dart';
 import 'settings/notification_settings_screen.dart';
+import 'settings/home_settings_screen.dart';
 import 'settings/server_settings_screen.dart';
 import 'settings/update_settings_screen.dart';
 
@@ -31,6 +32,12 @@ class SettingsScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
         children: [
           SettingsGroup(children: [
+            SettingsRow(
+              icon: Icons.home_outlined,
+              title: 'Home',
+              subtitle: 'Download panel on startup',
+              onTap: () => _open(context, HomeSettingsScreen(settings: settings)),
+            ),
             SettingsRow(
               icon: Icons.dns_outlined,
               title: 'Server',

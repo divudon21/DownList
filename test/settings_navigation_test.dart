@@ -30,10 +30,17 @@ void main() {
     await updates.initialize();
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: SettingsScreen(settings: SettingsService(), api: api, updates: updates, appearance: appearance))));
     await tester.pumpAndSettle();
+    expect(find.text('Home'), findsOneWidget);
     expect(find.text('Server'), findsOneWidget);
     expect(find.text('Notifications'), findsOneWidget);
     expect(find.text('About'), findsOneWidget);
     expect(find.text('Enter server URL'), findsNothing);
+
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    expect(find.text('Expand on startup'), findsOneWidget);
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Server'));
     await tester.pumpAndSettle();
