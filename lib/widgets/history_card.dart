@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/task_model.dart';
 import '../services/api_service.dart';
+import '../services/platform_service.dart';
 
 class HistoryCard extends StatelessWidget {
   const HistoryCard({
@@ -25,8 +25,9 @@ class HistoryCard extends StatelessWidget {
     return Card(
       elevation: 0,
       color: colorScheme.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         onTap: () => _showInfo(context),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -45,12 +46,14 @@ class HistoryCard extends StatelessWidget {
                     ),
                     child: Icon(
                       isVideo
-                          ? Icons.videocam
-                          : isImage
-                              ? Icons.image
-                              : task.isZip
-                                  ? Icons.folder_zip
-                                  : Icons.insert_drive_file,
+                          ? Icons.videocam_rounded
+                          : task.isAudio
+                              ? Icons.audiotrack_rounded
+                              : isImage
+                                  ? Icons.image_rounded
+                                  : task.isZip
+                                      ? Icons.folder_zip_rounded
+                                      : Icons.insert_drive_file_rounded,
                       color: _iconColor(colorScheme),
                       size: 28,
                     ),
@@ -76,8 +79,9 @@ class HistoryCard extends StatelessWidget {
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             _chip(
-                              context,
-                              task.isCompleted ? 'Completed' : 'Failed',
+                              task.isCompleted
+                                  ? (task.isLocalUpload ? 'Uploaded' : 'Completed')
+                                  : 'Failed',
                               task.isCompleted
                                   ? colorScheme.tertiaryContainer
                                   : colorScheme.errorContainer,
@@ -85,7 +89,9 @@ class HistoryCard extends StatelessWidget {
                                   ? colorScheme.onTertiaryContainer
                                   : colorScheme.onErrorContainer,
                               task.isCompleted
-                                  ? Icons.done_all
+                                  ? (task.isLocalUpload
+                                      ? Icons.cloud_done_outlined
+                                      : Icons.done_all)
                                   : Icons.error_outline,
                             ),
                             Text(
@@ -97,14 +103,16 @@ class HistoryCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _timestampText(task.timestamp),
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: colorScheme.onSurfaceVariant,
+                        if (task.timestamp != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _timestampText(task.timestamp),
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -114,7 +122,7 @@ class HistoryCard extends StatelessWidget {
               _ActionButtons(
                 onInfo: () => _showInfo(context),
                 onCopyLink: () => _copyLink(context),
-                onStream: () => _stream(context),
+                onStream: () => _streamInPlayer(context),
                 onDelete: () => _delete(context),
                 onRename: () => _rename(context),
               ),
@@ -125,8 +133,8 @@ class HistoryCard extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: task.progress,
                     minHeight: 7,
-                    backgroundColor: colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.4),
+                    backgroundColor: colorScheme.surfaceContainerLow
+                        .withValues(alpha: 0.8),
                     valueColor: AlwaysStoppedAnimation<Color>(
                       task.isError ? colorScheme.error : colorScheme.primary,
                     ),
@@ -177,7 +185,7 @@ class HistoryCard extends StatelessWidget {
           ),
         ),
       ),
-    ).animate().fadeIn(duration: 400.ms).slideX(begin: -0.1);
+    ).animate().fadeIn(duration: 350.ms).slideX(begin: -0.06);
   }
 
   Color _iconBg(ColorScheme c) {
@@ -193,7 +201,6 @@ class HistoryCard extends StatelessWidget {
   }
 
   Widget _chip(
-    BuildContext context,
     String label,
     Color bg,
     Color fg,
@@ -245,15 +252,22 @@ class HistoryCard extends StatelessWidget {
               _infoRow(dialogContext, 'Status', task.statusLabel),
               _infoRow(
                 dialogContext,
+                'Source',
+                task.isLocalUpload ? 'Uploaded from device' : task.url,
+              ),
+              _infoRow(
+                dialogContext,
                 'Type',
                 task.isVideo
                     ? 'Video'
-                    : task.isImage
-                        ? 'Image'
-                        : 'File',
+                    : task.isAudio
+                        ? 'Audio'
+                        : task.isImage
+                            ? 'Image'
+                            : 'File',
               ),
               _infoRow(dialogContext, 'Size', task.sizeFormatted),
-              _infoRow(dialogContext, 'Downloaded', task.downloadedFormatted),
+              _infoRow(dialogContext, 'Stored', task.downloadedFormatted),
               _infoRow(
                 dialogContext,
                 'Extension',
@@ -273,7 +287,7 @@ class HistoryCard extends StatelessWidget {
                 ),
               const Divider(height: 20),
               Text(
-                'Video details',
+                'Media details',
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   color: colorScheme.onSurfaceVariant,
@@ -291,8 +305,12 @@ class HistoryCard extends StatelessWidget {
                 'Bitrate',
                 'Not available (server exposes no media-metadata endpoint)',
               ),
-              if (task.isVideo)
-                _infoRow(dialogContext, 'Streamable', 'Yes — open in player'),
+              if (task.isVideo || task.isAudio)
+                _infoRow(
+                  dialogContext,
+                  'Streaming',
+                  'Supported — opens directly in external media player',
+                ),
               if (task.error != null) ...[
                 const Divider(height: 20),
                 _infoRow(dialogContext, 'Error', task.error!),
@@ -318,7 +336,7 @@ class HistoryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 110,
+            width: 100,
             child: Text(
               label,
               style: TextStyle(
@@ -356,23 +374,40 @@ class HistoryCard extends StatelessWidget {
     }
   }
 
-  Future<void> _stream(BuildContext context) async {
-    final url = api.streamUrl(task.taskId);
-    final uri = Uri.parse(url);
-    try {
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
+  Future<void> _streamInPlayer(BuildContext context) async {
+    if (!task.isCompleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('File is not ready for streaming.')),
       );
-      if (!launched && context.mounted) {
+      return;
+    }
+
+    final url = api.streamUrl(task.taskId);
+    final mimeType = PlatformService.guessMediaMimeType(
+      task.extension,
+      isAudio: task.isAudio,
+    );
+
+    try {
+      await PlatformService.instance.openExternalPlayer(
+        url: url,
+        fileName: task.fileName,
+        mimeType: mimeType,
+      );
+    } on PlatformException catch (e) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open stream URL')),
+          SnackBar(
+            content: Text(
+              e.message ?? 'No video player found on this device.',
+            ),
+          ),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Stream error: $e')),
+          SnackBar(content: Text('Could not open player: $e')),
         );
       }
     }
@@ -384,8 +419,8 @@ class HistoryCard extends StatelessWidget {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete not supported'),
         content: const Text(
-          'This server does not expose a single-file delete endpoint, so '
-          'delete cannot be performed server-side.',
+          'The server does not expose a single-file delete endpoint, so '
+          'individual file deletion cannot be performed server-side.',
         ),
         actions: [
           TextButton(
@@ -403,8 +438,8 @@ class HistoryCard extends StatelessWidget {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Rename not supported'),
         content: const Text(
-          'This server does not expose a rename endpoint, so rename cannot be '
-          'performed server-side.',
+          'The server does not expose a rename endpoint, so server-side '
+          'renaming cannot be performed.',
         ),
         actions: [
           TextButton(

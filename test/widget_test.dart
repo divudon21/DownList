@@ -4,12 +4,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ai_agent_downloader/main.dart';
 
 void main() {
-  testWidgets('AI Agent Downloader smoke test', (WidgetTester tester) async {
+  testWidgets('AI Agent Downloader starts with unconfigured server state', (
+    WidgetTester tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const AiAgentApp());
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('AI Agent Downloader'), findsOneWidget);
-    expect(find.text('Download from server'), findsOneWidget);
+    expect(find.text('Remote Download'), findsOneWidget);
   });
 }

@@ -1,9 +1,0 @@
-.git
-.github
-build
-android
-lib
-scripts
-release-apks
-*.apk
-*.md

@@ -20,9 +20,12 @@ class TaskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isVideo = task.isVideo;
+    final indeterminate = task.isActive && task.totalSize <= 0;
+
     return Card(
       elevation: 0,
       color: colorScheme.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -39,7 +42,7 @@ class TaskCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
-                    isVideo ? Icons.videocam : Icons.insert_drive_file,
+                    isVideo ? Icons.videocam_rounded : Icons.file_download_rounded,
                     color: colorScheme.onPrimaryContainer,
                     size: 26,
                   ),
@@ -61,9 +64,7 @@ class TaskCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         task.statusLabel +
-                            (task.isDownloading
-                                ? '  ·  ${task.speedFormatted}'
-                                : ''),
+                            (task.speed > 0 ? '  ·  ${task.speedFormatted}' : ''),
                         style: TextStyle(
                           fontSize: 12.5,
                           color: colorScheme.onSurfaceVariant,
@@ -73,8 +74,8 @@ class TaskCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  task.progress == 0
-                      ? '--%'
+                  indeterminate
+                      ? '...'
                       : '${(task.progress * 100).toInt()}%',
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
@@ -87,10 +88,10 @@ class TaskCard extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: LinearProgressIndicator(
-                value: task.progress,
+                value: indeterminate ? null : task.progress,
                 minHeight: 8,
                 backgroundColor:
-                    colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    colorScheme.surfaceContainerLow.withValues(alpha: 0.8),
                 valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
               ),
             ),
@@ -110,7 +111,7 @@ class TaskCard extends StatelessWidget {
                     context,
                     'Total Size',
                     task.totalSize <= 0 ? '--' : task.sizeFormatted,
-                    Icons.memory_outlined,
+                    Icons.sd_storage_outlined,
                   ),
                 ),
                 Expanded(
@@ -175,7 +176,7 @@ class TaskCard extends StatelessWidget {
           ],
         ),
       ),
-    ).animate().fadeIn(duration: 350.ms).slideY(begin: 0.15);
+    ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1);
   }
 
   Widget _stat(

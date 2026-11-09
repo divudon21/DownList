@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../services/api_service.dart';
@@ -8,10 +9,12 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.api,
     this.onViewTasks,
+    this.onOpenSettings,
   });
 
   final ApiService api;
   final VoidCallback? onViewTasks;
+  final VoidCallback? onOpenSettings;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -30,7 +33,29 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  Future<void> _pasteFromClipboard() async {
+    final clip = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = clip?.text?.trim() ?? '';
+    if (text.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Clipboard is empty')),
+      );
+      return;
+    }
+    setState(() {
+      _urlController.text = text;
+    });
+  }
+
   Future<void> _download() async {
+    if (!widget.api.isConfigured) {
+      setState(() {
+        _message = 'Please configure your Server URL in Settings first.';
+        _messageIsError = true;
+      });
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _isSubmitting = true;
@@ -40,13 +65,14 @@ class _HomeScreenState extends State<HomeScreen> {
       final taskId = await widget.api.startDownload(_urlController.text);
       if (!mounted) return;
       setState(() {
+        _urlController.clear();
         _message = 'Download started.\nTask ID: $taskId';
         _messageIsError = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _message = e.toString();
+        _message = e.toString().replaceFirst('Exception: ', '');
         _messageIsError = true;
       });
     } finally {
@@ -58,32 +84,42 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: 8),
-          _buildHeader().animate().fadeIn(duration: 600.ms).slideY(),
-          const SizedBox(height: 24),
-          _buildCard()
-              .animate()
-              .fadeIn(duration: 700.ms)
-              .slideY(delay: 100.ms),
-          const SizedBox(height: 20),
-          if (_message != null)
-            _buildMessage().animate().fadeIn(duration: 400.ms),
-        ],
-      ),
+    return ListenableBuilder(
+      listenable: widget.api,
+      builder: (context, _) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 8),
+              _buildHeader().animate().fadeIn(duration: 450.ms).slideY(begin: 0.06),
+              const SizedBox(height: 20),
+              if (!widget.api.isConfigured) ...[
+                _buildServerPromptCard(),
+                const SizedBox(height: 16),
+              ],
+              _buildCard()
+                  .animate()
+                  .fadeIn(duration: 500.ms)
+                  .slideY(begin: 0.06, delay: 60.ms),
+              const SizedBox(height: 20),
+              if (_message != null)
+                _buildMessage().animate().fadeIn(duration: 300.ms),
+            ],
+          ),
+        );
+      },
     );
   }
 
   Widget _buildHeader() {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Download from server',
+          'Remote Download',
           style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.w700,
@@ -92,14 +128,48 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Paste any file URL. It will be downloaded on your server '
-          '${widget.api.baseUrl.isNotEmpty ? widget.api.baseUrl : '(not set)'}.',
+          widget.api.isConfigured
+              ? 'Connected server: ${widget.api.baseUrl}'
+              : 'Paste any direct file URL to download it on your server.',
           style: TextStyle(
-            fontSize: 15,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 14,
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildServerPromptCard() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.secondaryContainer.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.dns_outlined, color: colorScheme.onSecondaryContainer),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'No server URL set yet. Add your server URL in Settings to start downloads.',
+              style: TextStyle(
+                fontSize: 13,
+                color: colorScheme.onSecondaryContainer,
+              ),
+            ),
+          ),
+          if (widget.onOpenSettings != null) ...[
+            const SizedBox(width: 8),
+            FilledButton.tonal(
+              onPressed: widget.onOpenSettings,
+              child: const Text('Settings'),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -107,8 +177,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Card(
       elevation: 0,
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(22),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: Column(
@@ -132,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
                 decoration: const InputDecoration(
                   labelText: 'File URL',
-                  hintText: 'https://example.com/file.zip',
+                  hintText: 'https://example.com/file.mp4',
                   prefixIcon: Icon(Icons.link_outlined),
                   border: OutlineInputBorder(),
                   filled: true,
@@ -147,21 +218,14 @@ class _HomeScreenState extends State<HomeScreen> {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.download_outlined),
+                    : const Icon(Icons.download_rounded),
                 label: Text(_isSubmitting ? 'Starting...' : 'Start Download'),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               OutlinedButton.icon(
-                onPressed: _isSubmitting
-                    ? null
-                    : () {
-                        setState(() {
-                          _urlController.text =
-                              'https://thed1-aiagent.hf.space/download/';
-                        });
-                      },
-                icon: const Icon(Icons.paste_outlined),
-                label: const Text('Paste example'),
+                onPressed: _isSubmitting ? null : _pasteFromClipboard,
+                icon: const Icon(Icons.content_paste_rounded),
+                label: const Text('Paste from Clipboard'),
               ),
             ],
           ),
@@ -182,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(
             _messageIsError ? Icons.error_outline : Icons.check_circle_outline,

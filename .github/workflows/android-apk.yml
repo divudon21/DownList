@@ -42,6 +42,7 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/custom_android
           cp android/app/src/main/AndroidManifest.xml /tmp/custom_android/AndroidManifest.xml
+          cp android/app/src/main/kotlin/com/example/ai_agent_downloader/MainActivity.kt /tmp/custom_android/MainActivity.kt
           cp -r android/app/src/main/res/mipmap-* /tmp/custom_android/
 
           rm -rf android
@@ -49,6 +50,8 @@ jobs:
             flutter create --platforms=android --org com.example --project-name ai_agent_downloader .
 
           cp /tmp/custom_android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          mkdir -p android/app/src/main/kotlin/com/example/ai_agent_downloader
+          cp /tmp/custom_android/MainActivity.kt android/app/src/main/kotlin/com/example/ai_agent_downloader/MainActivity.kt
           cp -r /tmp/custom_android/mipmap-* android/app/src/main/res/
           chmod +x android/gradlew
 

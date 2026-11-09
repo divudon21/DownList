@@ -1,16 +1,12 @@
-# Ok-AI & AI Agent Downloader
+# AI Agent Downloader
 
-This repository contains:
-1. **Ok-AI Backend (`app.py`, `Dockerfile`, `requirements.txt`)** — FastAPI AI agent backend server.
-2. **AI Agent Downloader (`lib/`, `android/`, `pubspec.yaml`)** — Material 3 Flutter Android client app for downloading, streaming, and tracking server tasks with a configurable server URL.
-3. **Automated Android APK Release Workflow (`.github/workflows/android-apk.yml`)** — Builds signed release APKs (`arm64-v8a`, `armeabi-v7a`, `x86_64`, and `universal`) via GitHub Actions and publishes them directly to **GitHub Releases**.
+Material 3 Flutter Android client for remote server downloads, multi-file streaming uploads, live task monitoring, and external media player streaming.
 
-## App Screens (Material 3)
+## Features
 
-| Tab | Description |
-|-----|-------------|
-| **Home** | Submit any file URL to start a server-side download (`POST /start_download`) |
-| **Task** | Live progress, speed, downloaded/total bytes, and ETA for active downloads (`GET /status/{id}`) |
-| **History** | Completed & failed downloads with file info, link copy, external player streaming, and status badges |
-| **Upload** | Placeholder screen |
-| **Settings** | Configure & persist custom server URL on-device via `SharedPreferences` |
+- **Manual Server Configuration (`Settings`)** — Enter and save your own server URL on-device via `SharedPreferences` (no default or hardcoded server URL).
+- **Remote Downloads (`Home`)** — Paste any file URL and start server-side downloads via `POST /start_download`.
+- **Multi-File Streaming Uploads (`Upload`)** — Select one or multiple files simultaneously, view file sizes, live upload speed, uploaded/total bytes, ETA, and cancel individual or all active uploads at any time (`POST /upload`).
+- **Live Task Tracking (`Task`)** — Real-time monitoring of both active server downloads (`GET /history` & `GET /status/{id}`) and active file uploads.
+- **History & Direct Video Player Streaming (`History`)** — Browse completed & failed items, copy download links, inspect file metadata, and launch streams (`GET /stream/{id}`) directly in installed Android video/media players instead of the browser.
+- **Automated Signed APK Releases (`.github/workflows/android-apk.yml`)** — Builds signed `arm64-v8a`, `armeabi-v7a`, `x86_64`, and `universal` APKs via GitHub Actions and publishes them to GitHub Releases.

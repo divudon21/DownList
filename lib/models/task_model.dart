@@ -13,6 +13,7 @@ class TaskModel {
     this.error,
     this.etaSeconds,
     this.verified,
+    this.gofileUrl,
   });
 
   final String taskId;
@@ -28,6 +29,7 @@ class TaskModel {
   final String? error;
   final int? etaSeconds;
   final bool? verified;
+  final String? gofileUrl;
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
     return TaskModel(
@@ -44,6 +46,7 @@ class TaskModel {
       error: json['error']?.toString(),
       etaSeconds: _toInt(json['eta_seconds']),
       verified: json['verified'] is bool ? json['verified'] as bool : null,
+      gofileUrl: json['gofile_url']?.toString(),
     );
   }
 
@@ -51,7 +54,8 @@ class TaskModel {
     if (v == null) return null;
     if (v is int) return v;
     if (v is num) return v.toInt();
-    return int.tryParse(v.toString());
+    final str = v.toString();
+    return int.tryParse(str) ?? double.tryParse(str)?.toInt();
   }
 
   static double? _toDouble(dynamic v) {
@@ -75,12 +79,16 @@ class TaskModel {
       'error': error,
       'eta_seconds': etaSeconds,
       'verified': verified,
+      'gofile_url': gofileUrl,
     };
   }
 
   String get fileName {
-    if (originalFilename != null && originalFilename!.isNotEmpty) {
-      return originalFilename!;
+    if (originalFilename != null && originalFilename!.trim().isNotEmpty) {
+      return originalFilename!.trim();
+    }
+    if (url == 'local_upload') {
+      return 'uploaded_file';
     }
     final clean = url.split('?').first;
     final segments = clean.split('/');
@@ -104,6 +112,10 @@ class TaskModel {
       'flv',
       'm4v',
       '3gp',
+      'ts',
+      'm2ts',
+      'mpg',
+      'mpeg',
     }.contains(extension);
   }
 
@@ -121,19 +133,40 @@ class TaskModel {
   }
 
   bool get isAudio {
-    return const {'mp3', 'wav', 'aac', 'ogg', 'flac', 'm4a'}
-        .contains(extension);
+    return const {
+      'mp3',
+      'wav',
+      'aac',
+      'ogg',
+      'flac',
+      'm4a',
+      'opus',
+    }.contains(extension);
   }
 
   bool get isZip => extension == 'zip';
 
-  bool get isCompleted => status == 'completed';
-  bool get isError => status == 'error';
-  bool get isDownloading => status == 'downloading';
-  bool get isActive =>
-      status == 'downloading' ||
-      status == 'extracting' ||
-      status == 'uploading_to_gofile';
+  bool get isLocalUpload => url == 'local_upload';
+
+  bool get isCompleted {
+    final s = status.toLowerCase();
+    return s == 'completed' ||
+        s == 'extracted' ||
+        s == 'done' ||
+        s == 'finished';
+  }
+
+  bool get isError {
+    final s = status.toLowerCase();
+    return s == 'error' ||
+        s == 'failed' ||
+        s == 'extraction_error' ||
+        s == 'cancelled';
+  }
+
+  bool get isDownloading => status.toLowerCase() == 'downloading';
+
+  bool get isActive => taskId.isNotEmpty && !isCompleted && !isError;
 
   double get progress {
     if (totalSize <= 0) return 0.0;
@@ -143,43 +176,44 @@ class TaskModel {
     return p;
   }
 
-  String get sizeFormatted => _formatBytes(totalSize);
-  String get downloadedFormatted => _formatBytes(downloaded);
+  String get sizeFormatted => formatBytes(totalSize);
+  String get downloadedFormatted => formatBytes(downloaded);
 
   String get speedFormatted {
     if (speed <= 0) return '--';
-    return '${_formatBytes(speed.round())}/s';
+    return '${formatBytes(speed.round())}/s';
   }
 
   String get etaFormatted {
     if (etaSeconds == null || etaSeconds! <= 0) return '--';
-    final s = etaSeconds!;
-    final h = s ~/ 3600;
-    final m = (s % 3600) ~/ 60;
-    final sec = s % 60;
-    if (h > 0) return '${h}h ${m}m ${sec}s';
-    if (m > 0) return '${m}m ${sec}s';
-    return '${sec}s';
+    return formatDurationSeconds(etaSeconds!);
   }
 
   String get statusLabel {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'completed':
         return 'Completed';
+      case 'extracted':
+        return 'Extracted';
       case 'error':
+      case 'failed':
+      case 'extraction_error':
         return 'Failed';
       case 'downloading':
-        return 'Downloading';
+        return totalSize <= 0 && downloaded <= 0 ? 'Connecting...' : 'Downloading';
       case 'extracting':
         return 'Extracting';
       case 'uploading_to_gofile':
-        return 'Uploading';
+        return 'Uploading to GoFile';
+      case 'pending':
+      case 'queued':
+        return 'Queued';
       default:
-        return 'Unknown';
+        return status.isEmpty ? 'Processing' : status;
     }
   }
 
-  static String _formatBytes(int bytes) {
+  static String formatBytes(int bytes) {
     if (bytes <= 0) return '0 B';
     const suffixes = ['B', 'KB', 'MB', 'GB', 'TB'];
     var i = 0;
@@ -188,39 +222,17 @@ class TaskModel {
       size /= 1024;
       i++;
     }
-    return '${size.toStringAsFixed(1)} ${suffixes[i]}';
+    return '${size.toStringAsFixed(i == 0 ? 0 : 1)} ${suffixes[i]}';
   }
 
-  TaskModel copyWith({
-    String? taskId,
-    String? url,
-    String? status,
-    int? totalSize,
-    int? downloaded,
-    double? speed,
-    String? originalFilename,
-    String? filePath,
-    bool? resumable,
-    int? timestamp,
-    String? error,
-    int? etaSeconds,
-    bool? verified,
-  }) {
-    return TaskModel(
-      taskId: taskId ?? this.taskId,
-      url: url ?? this.url,
-      status: status ?? this.status,
-      totalSize: totalSize ?? this.totalSize,
-      downloaded: downloaded ?? this.downloaded,
-      speed: speed ?? this.speed,
-      originalFilename: originalFilename ?? this.originalFilename,
-      filePath: filePath ?? this.filePath,
-      resumable: resumable ?? this.resumable,
-      timestamp: timestamp ?? this.timestamp,
-      error: error ?? this.error,
-      etaSeconds: etaSeconds ?? this.etaSeconds,
-      verified: verified ?? this.verified,
-    );
+  static String formatDurationSeconds(int seconds) {
+    if (seconds <= 0) return '--';
+    final h = seconds ~/ 3600;
+    final m = (seconds % 3600) ~/ 60;
+    final sec = seconds % 60;
+    if (h > 0) return '${h}h ${m}m ${sec}s';
+    if (m > 0) return '${m}m ${sec}s';
+    return '${sec}s';
   }
 }
 
@@ -256,30 +268,17 @@ class ServerStatus {
   factory ServerStatus.fromJson(Map<String, dynamic> json) {
     return ServerStatus(
       serverOnline: json['server_online'] == true,
-      ramTotal: _toInt(json['ram_total']),
-      ramUsed: _toInt(json['ram_used']),
-      ramPercent: _toDouble(json['ram_percent']),
-      storageTotal: _toInt(json['storage_total']),
-      storageUsed: _toInt(json['storage_used']),
-      storageFree: _toInt(json['storage_free']),
-      storagePercent: _toDouble(json['storage_percent']),
-      activeTasks: _toInt(json['active_tasks']),
-      uptime: _toDouble(json['uptime']),
-      pingMs: _toInt(json['ping_ms']),
-      temperature: _toInt(json['temperature']),
+      ramTotal: TaskModel._toInt(json['ram_total']),
+      ramUsed: TaskModel._toInt(json['ram_used']),
+      ramPercent: TaskModel._toDouble(json['ram_percent']),
+      storageTotal: TaskModel._toInt(json['storage_total']),
+      storageUsed: TaskModel._toInt(json['storage_used']),
+      storageFree: TaskModel._toInt(json['storage_free']),
+      storagePercent: TaskModel._toDouble(json['storage_percent']),
+      activeTasks: TaskModel._toInt(json['active_tasks']),
+      uptime: TaskModel._toDouble(json['uptime']),
+      pingMs: TaskModel._toInt(json['ping_ms']),
+      temperature: TaskModel._toInt(json['temperature']),
     );
-  }
-
-  static int? _toInt(dynamic v) {
-    if (v == null) return null;
-    if (v is int) return v;
-    if (v is num) return v.toInt();
-    return int.tryParse(v.toString());
-  }
-
-  static double? _toDouble(dynamic v) {
-    if (v == null) return null;
-    if (v is num) return v.toDouble();
-    return double.tryParse(v.toString());
   }
 }
