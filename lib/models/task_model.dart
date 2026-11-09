@@ -35,6 +35,9 @@ class TaskModel {
   final String? taskType;
   final bool localDeleted;
   bool get hasGofileUrl => gofileUrl != null && gofileUrl!.isNotEmpty;
+  bool get isGofileTransfer => taskType == 'gofile';
+  bool get isGofileUpload => status.toLowerCase() == 'uploading_to_gofile';
+  bool get gofileUploadProgressKnown => isGofileUpload && downloaded > 0 && downloaded < totalSize;
 
   factory TaskModel.fromJson(Map<String, dynamic> json) {
     return TaskModel(
@@ -87,6 +90,8 @@ class TaskModel {
       'eta_seconds': etaSeconds,
       'verified': verified,
       'gofile_url': gofileUrl,
+      'task_type': taskType,
+      'local_deleted': localDeleted,
     };
   }
 
@@ -157,7 +162,7 @@ class TaskModel {
 
   bool get isCompleted {
     final s = status.toLowerCase();
-    return s == 'completed' ||
+    return (s == 'completed' && (!isGofileTransfer || hasGofileUrl)) ||
         s == 'extracted' ||
         s == 'done' ||
         s == 'finished';
@@ -199,7 +204,7 @@ class TaskModel {
   String get statusLabel {
     switch (status.toLowerCase()) {
       case 'completed':
-        return 'Completed';
+        return isGofileTransfer && !hasGofileUrl ? 'Preparing GoFile upload' : 'Completed';
       case 'extracted':
         return 'Extracted';
       case 'error':

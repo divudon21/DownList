@@ -39,6 +39,8 @@ class NativeUploadEvent {
     this.speed,
     this.responseBody,
     this.error,
+    this.uri,
+    this.fileName,
   });
 
   final String uploadId;
@@ -48,6 +50,8 @@ class NativeUploadEvent {
   final double? speed;
   final String? responseBody;
   final String? error;
+  final String? uri;
+  final String? fileName;
 }
 
 class PlatformService {
@@ -79,6 +83,8 @@ class PlatformService {
           speed: (map['speed'] as num?)?.toDouble(),
           responseBody: map['responseBody']?.toString(),
           error: map['error']?.toString(),
+          uri: map['uri']?.toString(),
+          fileName: map['fileName']?.toString(),
         ),
       );
     }
@@ -113,6 +119,31 @@ class PlatformService {
       'fileSize': fileSize,
       'uploadUrl': uploadUrl,
     });
+  }
+
+  Future<void> monitorServerTask(String baseUrl, String taskId, {required bool isGofile}) async {
+    await _channel.invokeMethod<bool>('startServerMonitor', {'baseUrl': baseUrl, 'taskId': taskId, 'isGofile': isGofile});
+  }
+
+  Future<Map<String, bool>> getNotificationSettings() async {
+    final result = await _channel.invokeMapMethod<String, dynamic>('getNotificationSettings') ?? {};
+    return {'uploads': result['uploads'] == true, 'downloads': result['downloads'] == true, 'enabled': result['enabled'] == true};
+  }
+
+  Future<bool> requestNotificationPermission() async => await _channel.invokeMethod<bool>('requestNotificationPermission') ?? false;
+  Future<void> setNotificationSetting(String key, bool value) async { await _channel.invokeMethod<bool>('setNotificationSetting', {'key': key, 'value': value}); }
+  Future<void> openNotificationSettings() async { await _channel.invokeMethod<bool>('openNotificationSettings'); }
+  Future<List<dynamic>> getServerTaskSnapshots() async => await _channel.invokeListMethod<dynamic>('getServerTaskSnapshots') ?? [];
+
+  Future<List<NativeUploadEvent>> getUploadSnapshots() async {
+    final raw = await _channel.invokeListMethod<dynamic>('getUploadSnapshots') ?? [];
+    return raw.whereType<Map>().map((e) {
+      final m = Map<dynamic, dynamic>.from(e);
+      return NativeUploadEvent(uploadId: '${m['uploadId'] ?? ''}', status: '${m['status'] ?? ''}',
+        uploadedBytes: (m['uploadedBytes'] as num?)?.toInt(), totalBytes: (m['totalBytes'] as num?)?.toInt(),
+        speed: (m['speed'] as num?)?.toDouble(), responseBody: m['responseBody']?.toString(), error: m['error']?.toString(),
+        uri: m['uri']?.toString(), fileName: m['fileName']?.toString());
+    }).toList();
   }
 
   Future<void> cancelUpload(String uploadId) async {

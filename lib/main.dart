@@ -11,6 +11,7 @@ import 'screens/upload_screen.dart';
 import 'services/api_service.dart';
 import 'services/settings_service.dart';
 import 'services/upload_manager.dart';
+import 'services/platform_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,9 +44,15 @@ class _AiAgentAppState extends State<AiAgentApp> {
     final savedUrl = await _settings.getServerUrl();
     if (!mounted) return;
     _api.baseUrl = savedUrl;
+    await _api.restoreMonitoredTasks();
+    if (!mounted) return;
     setState(() {
       _ready = true;
     });
+    if (!await _settings.notificationPermissionAsked()) {
+      await _settings.markNotificationPermissionAsked();
+      try { await PlatformService.instance.requestNotificationPermission(); } catch (_) {}
+    }
   }
 
   @override

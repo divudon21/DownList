@@ -20,7 +20,7 @@ class TaskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isVideo = task.isVideo;
-    final indeterminate = task.isActive && task.totalSize <= 0;
+    final indeterminate = task.isActive && (task.totalSize <= 0 || (task.isGofileTransfer && task.status == 'completed') || (task.isGofileUpload && !task.gofileUploadProgressKnown));
 
     return Card(
       elevation: 0,
@@ -102,7 +102,7 @@ class TaskCard extends StatelessWidget {
                   child: _stat(
                     context,
                     task.status == 'uploading_to_gofile' ? 'Uploaded' : 'Downloaded',
-                    task.downloadedFormatted,
+                    task.isGofileUpload && !task.gofileUploadProgressKnown ? '--' : task.downloadedFormatted,
                     Icons.done_outline,
                   ),
                 ),

@@ -4,12 +4,14 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/task_model.dart';
+import 'platform_service.dart';
 
 class ApiService extends ChangeNotifier {
   ApiService({String baseUrl = ''}) : _baseUrl = _normalize(baseUrl);
 
   String _baseUrl;
   final Set<String> _sessionTaskIds = <String>{};
+  final Set<String> _gofileTaskIds = <String>{};
   int _historyVersion = 0;
   int _activeServerTaskCount = 0;
 
@@ -18,6 +20,20 @@ class ApiService extends ChangeNotifier {
   bool get isConfigured => _baseUrl.isNotEmpty;
 
   Set<String> get sessionTaskIds => Set<String>.unmodifiable(_sessionTaskIds);
+  Set<String> get gofileTaskIds => Set<String>.unmodifiable(_gofileTaskIds);
+
+  Future<void> restoreMonitoredTasks() async {
+    try {
+      final snapshot = await PlatformService.instance.getServerTaskSnapshots();
+      for (final item in snapshot.whereType<Map>()) {
+        if (item['baseUrl'] != _baseUrl) continue;
+        final id = item['taskId']?.toString() ?? '';
+        if (id.isEmpty) continue;
+        _sessionTaskIds.add(id);
+        if (item['isGofile'] == true) _gofileTaskIds.add(id);
+      }
+    } catch (_) {}
+  }
 
   int get historyVersion => _historyVersion;
 
@@ -34,6 +50,7 @@ class ApiService extends ChangeNotifier {
     if (_baseUrl == normalized) return;
     _baseUrl = normalized;
     _sessionTaskIds.clear();
+    _gofileTaskIds.clear();
     _activeServerTaskCount = 0;
     _historyVersion++;
     notifyListeners();
@@ -83,6 +100,7 @@ class ApiService extends ChangeNotifier {
         throw Exception(err ?? 'Server did not return a task_id.');
       }
       _sessionTaskIds.add(taskId);
+      PlatformService.instance.monitorServerTask(_baseUrl, taskId, isGofile: false).catchError((_) {});
       notifyListeners();
       return taskId;
     }
@@ -100,6 +118,7 @@ class ApiService extends ChangeNotifier {
       if (data['task_id'] == null && data['error'] != null) {
         throw Exception(data['error'].toString());
       }
+      if (_gofileTaskIds.contains(taskId)) data['task_type'] = 'gofile';
       return TaskModel.fromJson(data);
     }
     if (response.statusCode == 404) {
@@ -119,7 +138,11 @@ class ApiService extends ChangeNotifier {
       final list = data['history'] as List<dynamic>? ?? const [];
       return list
           .whereType<Map>()
-          .map((e) => TaskModel.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) {
+            final data = Map<String, dynamic>.from(e);
+            if (_gofileTaskIds.contains(data['task_id']?.toString())) data['task_type'] = 'gofile';
+            return TaskModel.fromJson(data);
+          })
           .where((t) => t.taskId.isNotEmpty)
           .toList();
     }
@@ -162,6 +185,8 @@ class ApiService extends ChangeNotifier {
     final id = data['task_id']?.toString() ?? '';
     if (id.isEmpty) throw Exception('Server did not return a task ID.');
     _sessionTaskIds.add(id);
+    _gofileTaskIds.add(id);
+    PlatformService.instance.monitorServerTask(_baseUrl, id, isGofile: true).catchError((_) {});
     notifyListeners();
     return id;
   }

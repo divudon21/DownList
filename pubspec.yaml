@@ -1,7 +1,7 @@
 name: ai_agent_downloader
 description: DownList — Material 3 client for remote downloads, multi-file uploads, and external video player streaming.
 publish_to: 'none'
-version: 1.2.0+3
+version: 1.2.1+4
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

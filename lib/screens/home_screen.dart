@@ -37,6 +37,17 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _messageIsError = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.api.gofileTaskIds.isNotEmpty) {
+      _gofileTaskId = widget.api.gofileTaskIds.last;
+      _gofileServer = widget.api.baseUrl;
+      _gofileTimer = Timer.periodic(const Duration(seconds: 2), (_) => _pollGofile());
+      _pollGofile();
+    }
+  }
+
+  @override
   void dispose() {
     _gofileTimer?.cancel();
     _urlController.dispose();
@@ -133,8 +144,12 @@ class _HomeScreenState extends State<HomeScreen> {
       Text(task.hasGofileUrl ? 'GoFile Link Ready' : 'GoFile transfer: ${task.statusLabel}', style: Theme.of(context).textTheme.titleMedium),
       if (task.isActive) ...[
         const SizedBox(height: 10),
-        LinearProgressIndicator(value: task.totalSize > 0 ? task.progress : null),
-        Text('${task.downloadedFormatted} / ${task.sizeFormatted}  ·  ${task.speedFormatted}'),
+        LinearProgressIndicator(value: task.totalSize > 0 && (!task.isGofileUpload || task.gofileUploadProgressKnown) && task.status != 'completed' ? task.progress : null),
+        Text(task.isGofileUpload && !task.gofileUploadProgressKnown
+            ? 'Uploading to GoFile — progress unavailable or waiting for confirmation'
+            : task.status == 'completed' && !task.hasGofileUrl
+                ? 'Preparing to upload to GoFile…'
+                : '${task.downloadedFormatted} / ${task.sizeFormatted}  ·  ${task.speedFormatted}'),
       ],
       if (task.error != null) Text(task.error!),
       if (task.hasGofileUrl) ...[

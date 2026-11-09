@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../models/task_model.dart';
 import '../services/api_service.dart';
 import '../services/settings_service.dart';
+import '../services/platform_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -20,27 +21,55 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObserver {
   late final TextEditingController _urlController;
   bool _isLoading = true;
   bool _isTesting = false;
   String? _status;
   bool _statusIsError = false;
+  bool _showUploads = true;
+  bool _showDownloads = true;
+  bool _notificationsEnabled = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _urlController = TextEditingController();
     _load();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _urlController.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _loadNotificationSettings();
+  }
+
+  Future<void> _loadNotificationSettings() async {
+    try {
+      final values = await PlatformService.instance.getNotificationSettings();
+      if (mounted) setState(() { _showUploads = values['uploads'] ?? true; _showDownloads = values['downloads'] ?? true; _notificationsEnabled = values['enabled'] ?? false; });
+    } catch (_) {}
+  }
+
+  Future<void> _setNotification(String key, bool value) async {
+    try {
+      await PlatformService.instance.setNotificationSetting(key, value);
+      if (value) await PlatformService.instance.requestNotificationPermission();
+      await _loadNotificationSettings();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Notification settings unavailable: $e')));
+    }
+  }
+
   Future<void> _load() async {
+    _loadNotificationSettings();
     final url = await widget.settings.getServerUrl();
     if (!mounted) return;
     setState(() {
@@ -268,6 +297,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 24),
+              Text('Notifications', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text('Choose which transfer details appear in the notification.', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+              const SizedBox(height: 12),
+              Card(
+                elevation: 0, color: colorScheme.surfaceContainerHighest,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Column(children: [
+                  SwitchListTile(
+                    secondary: const Icon(Icons.cloud_upload_outlined),
+                    title: const Text('Show upload details'),
+                    subtitle: const Text('Device and GoFile uploads with progress'),
+                    value: _showUploads, onChanged: (value) => _setNotification('uploads', value),
+                  ),
+                  const Divider(height: 1, indent: 16, endIndent: 16),
+                  SwitchListTile(
+                    secondary: const Icon(Icons.download_outlined),
+                    title: const Text('Show download details'),
+                    subtitle: const Text('Server download progress'),
+                    value: _showDownloads, onChanged: (value) => _setNotification('downloads', value),
+                  ),
+                  if (!_notificationsEnabled)
+                    ListTile(leading: const Icon(Icons.notifications_off_outlined),
+                      title: const Text('Notifications are disabled'),
+                      subtitle: const Text('Allow notifications in Android settings to see transfer progress.'),
+                      trailing: TextButton(onPressed: () async { try { await PlatformService.instance.openNotificationSettings(); } catch (_) {} }, child: const Text('Open'))),
+                ]),
+              ),
+              Padding(padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: Text('Android may show a basic service notification during background transfers even when details are off.', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant))),
               if (_status != null) ...[
                 const SizedBox(height: 16),
                 _statusBox(context).animate().fadeIn(duration: 300.ms),

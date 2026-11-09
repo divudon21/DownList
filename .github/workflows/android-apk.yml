@@ -42,7 +42,7 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/custom_android
           cp android/app/src/main/AndroidManifest.xml /tmp/custom_android/AndroidManifest.xml
-          cp android/app/src/main/kotlin/com/example/ai_agent_downloader/MainActivity.kt /tmp/custom_android/MainActivity.kt
+          cp android/app/src/main/kotlin/com/example/ai_agent_downloader/*.kt /tmp/custom_android/
           cp android/app/src/main/res/drawable/ic_launcher_monochrome.xml /tmp/custom_android/ic_launcher_monochrome.xml
           cp -r android/app/src/main/res/mipmap-* /tmp/custom_android/
 
@@ -52,7 +52,7 @@ jobs:
 
           cp /tmp/custom_android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
           mkdir -p android/app/src/main/kotlin/com/example/ai_agent_downloader
-          cp /tmp/custom_android/MainActivity.kt android/app/src/main/kotlin/com/example/ai_agent_downloader/MainActivity.kt
+          cp /tmp/custom_android/*.kt android/app/src/main/kotlin/com/example/ai_agent_downloader/
           mkdir -p android/app/src/main/res/drawable
           cp /tmp/custom_android/ic_launcher_monochrome.xml android/app/src/main/res/drawable/ic_launcher_monochrome.xml
           rm -rf android/app/src/main/res/mipmap-*
