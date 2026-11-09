@@ -175,24 +175,21 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/arena/a1948697-ok-ai'
+        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_CHANNEL: ${{ inputs.release_channel || 'stable' }}
           ALLOW_SIGNING_MIGRATION: ${{ inputs.allow_signing_migration || false }}
         run: |
           set -euo pipefail
-          # One-time branch release requested by the user. Main remains protected.
-          if [ "$GITHUB_REF" = refs/heads/main ]; then
-            if [ "$SIGNING_MODE" != stable ]; then
-              echo '::error::A persistent Android signing key is required for publishing.'
-              exit 1
-            fi
-            gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > /tmp/previous_releases.json
-            MIGRATION=()
-            if [ "$ALLOW_SIGNING_MIGRATION" = true ]; then MIGRATION=(--allow-migration); fi
-            python3 scripts/check_release_signer.py /tmp/previous_releases.json "$APP_SIGNER_SHA256" "${MIGRATION[@]}"
+          if [ "$SIGNING_MODE" != stable ]; then
+            echo '::error::A persistent Android signing key is required for publishing. Configure the signing secrets before releasing.'
+            exit 1
           fi
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > /tmp/previous_releases.json
+          MIGRATION=()
+          if [ "$ALLOW_SIGNING_MIGRATION" = true ]; then MIGRATION=(--allow-migration); fi
+          python3 scripts/check_release_signer.py /tmp/previous_releases.json "$APP_SIGNER_SHA256" "${MIGRATION[@]}"
           TAG="v1.0.${GITHUB_RUN_NUMBER}"
           TITLE="DownList ${APP_VERSION_NAME} (build ${GITHUB_RUN_NUMBER})"
           METADATA=$(python3 -c 'import json,os; print(json.dumps({"packageName":"com.dowlist.com","versionName":os.environ["APP_VERSION_NAME"],"versionCode":int(os.environ["GITHUB_RUN_NUMBER"]),"signerSha256":os.environ["APP_SIGNER_SHA256"]},separators=(",",":")))')
@@ -202,9 +199,6 @@ jobs:
             exit 1
           fi
           cat "$NOTES" > /tmp/release_notes.md
-          if [ "$GITHUB_REF" != refs/heads/main ]; then
-            printf '\n**Installation:** This APK uses a different, temporary signing key. Uninstall the previous app before installing; uninstalling removes local app data. Future differently signed builds will also require reinstalling.\n' >> /tmp/release_notes.md
-          fi
           printf '\n<!-- downlist-update:%s -->\n' "$METADATA" >> /tmp/release_notes.md
 
           if gh release view "$TAG" >/dev/null 2>&1; then
