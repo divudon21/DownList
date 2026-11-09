@@ -28,6 +28,9 @@ void main() {
     final api = ApiService();
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: SettingsScreen(settings: SettingsService(), api: api))));
     await tester.pumpAndSettle();
+    expect(find.text('Show upload details'), findsNothing);
+    await tester.tap(find.text('Notifications'));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Show upload details'));
     await tester.tap(find.text('Show upload details'));
     await tester.pumpAndSettle();

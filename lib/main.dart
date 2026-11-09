@@ -161,7 +161,9 @@ class _HomePageState extends State<HomePage> {
         return Scaffold(
           appBar: AppBar(
             titleSpacing: 16,
-            title: Row(
+            title: _selectedIndex == 4
+                ? const Text('Settings', style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: -0.3))
+                : Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 ClipRRect(

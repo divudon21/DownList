@@ -209,6 +209,8 @@ class PlatformService {
     });
   }
 
+  Future<String> getAppVersion() async => await _channel.invokeMethod<String>('getAppVersion') ?? '';
+
   Future<void> openUrl(String url) async {
     await _channel.invokeMethod<bool>('openUrl', {'url': url});
   }

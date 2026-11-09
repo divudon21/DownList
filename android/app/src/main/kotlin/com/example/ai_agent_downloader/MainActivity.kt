@@ -79,6 +79,12 @@ class MainActivity : FlutterActivity() {
         TransferService.eventSink = { payload -> mainHandler.post { methodChannel?.invokeMethod("onUploadEvent", payload) } }
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "getAppVersion" -> {
+                    try {
+                        val info = packageManager.getPackageInfo(packageName, 0)
+                        result.success(info.versionName ?: "")
+                    } catch (_: Exception) { result.success("") }
+                }
                 "pickFiles" -> handlePickFiles(result)
                 "startUpload" -> handleStartUpload(call, result)
                 "cancelUpload" -> handleCancelUpload(call, result)
