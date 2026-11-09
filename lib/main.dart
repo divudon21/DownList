@@ -210,6 +210,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final totalActiveCount = widget.uploadManager.activeItems.length +
             widget.api.activeServerTaskCount;
 
+        const pageTitles = ['Home', 'Task', 'History', 'Upload', 'Settings'];
+        final pageTitle = pageTitles[_selectedIndex];
+
         final navItems = <LiquidGlassNavItem>[
           LiquidGlassNavItem(
             id: 'home',
@@ -300,29 +303,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           extendBody: true,
           appBar: AppBar(
             titleSpacing: 16,
-            title: _selectedIndex == 4
-                ? const Text('Settings', style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: -0.3))
-                : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    'assets/images/downlist_logo.png',
-                    width: 30,
-                    height: 30,
-                    filterQuality: FilterQuality.high,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'DownList',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-              ],
+            title: Text(
+              pageTitle,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
+              ),
             ),
             centerTitle: false,
             actions: _selectedIndex == 0 ? [

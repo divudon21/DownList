@@ -24,7 +24,7 @@ void main() {
     await tester.pumpWidget(const AiAgentApp(impellerSupported: false));
     await tester.pumpAndSettle();
 
-    expect(find.text('DownList'), findsOneWidget);
+    expect(find.descendant(of: find.byType(AppBar), matching: find.text('Home')), findsOneWidget);
     expect(find.text('Remote Download'), findsOneWidget);
     final navigation = tester.widget<LiquidGlassNavBar>(find.byType(LiquidGlassNavBar));
     expect(navigation.items, hasLength(5));
@@ -35,14 +35,28 @@ void main() {
       );
     }
     expect(navigation.selectedIndex, 0);
-    await tester.tap(find.descendant(
-      of: find.byType(LiquidGlassNavBar), matching: find.text('History')));
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(tester.widget<LiquidGlassNavBar>(find.byType(LiquidGlassNavBar)).selectedIndex, 2);
-    await tester.pumpAndSettle();
-    await tester.tap(find.descendant(
-      of: find.byType(LiquidGlassNavBar), matching: find.text('Home')));
-    await tester.pumpAndSettle();
+    expect(find.text('Live server downloads and active file uploads.'), findsNothing);
+
+    for (final tab in [
+      ('Task', 1),
+      ('Upload', 3),
+      ('History', 2),
+      ('Settings', 4),
+      ('Home', 0),
+    ]) {
+      await tester.tap(find.descendant(
+        of: find.byType(LiquidGlassNavBar), matching: find.text(tab.$1)));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<LiquidGlassNavBar>(find.byType(LiquidGlassNavBar)).selectedIndex,
+        tab.$2,
+      );
+      expect(
+        find.descendant(of: find.byType(AppBar), matching: find.text(tab.$1)),
+        findsOneWidget,
+      );
+    }
+    expect(find.descendant(of: find.byType(AppBar), matching: find.text('Home')), findsOneWidget);
     expect(find.text('GoFile'), findsNothing);
     await tester.tap(find.byType(TextFormField));
     await tester.pumpAndSettle();
