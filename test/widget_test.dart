@@ -25,11 +25,27 @@ void main() {
 
     expect(find.text('DownList'), findsOneWidget);
     expect(find.text('Remote Download'), findsOneWidget);
+    final navigation = tester.widget<NavigationBar>(find.byType(NavigationBar));
+    expect(navigation.destinations.map((destination) => destination.label),
+        ['Home', 'Task', 'History', 'Upload', 'Settings']);
+    expect(navigation.selectedIndex, 0);
+    await tester.tap(find.text('History'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 2);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
     expect(find.text('GoFile'), findsNothing);
     await tester.tap(find.byType(TextFormField));
     await tester.pumpAndSettle();
     expect(find.text('GoFile'), findsOneWidget);
     expect(find.text('Clipboard'), findsOneWidget);
+    await tester.tap(find.text('History'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    expect(find.text('Start Download'), findsOneWidget);
+    expect(find.text('GoFile'), findsOneWidget);
     expect(find.byTooltip('Server Info'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);

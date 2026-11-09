@@ -271,16 +271,42 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ] : null,
           ),
           body: SafeArea(
-            child: IndexedStack(
-              index: _selectedIndex,
-              children: pages,
+            child: Stack(
+              fit: StackFit.expand,
+              children: List<Widget>.generate(pages.length, (index) {
+                final selected = index == _selectedIndex;
+                return Positioned.fill(
+                  child: IgnorePointer(
+                    ignoring: !selected,
+                    child: ExcludeSemantics(
+                      excluding: !selected,
+                      child: AnimatedScale(
+                        scale: selected ? 1 : 0.985,
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOutCubic,
+                        child: AnimatedOpacity(
+                          opacity: selected ? 1 : 0,
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.linear,
+                          child: pages[index],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
             ),
           ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _selectedIndex,
             onDestinationSelected: _selectTab,
-            animationDuration: const Duration(milliseconds: 300),
-            labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+            animationDuration: const Duration(milliseconds: 240),
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+            indicatorColor: Theme.of(context).colorScheme.secondaryContainer,
+            indicatorShape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
             destinations: [
               const NavigationDestination(
                 icon: Icon(Icons.home_outlined),
