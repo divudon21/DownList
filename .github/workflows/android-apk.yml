@@ -1,0 +1,152 @@
+name: Build APKs & Create Release
+
+on:
+  push:
+    branches:
+      - main
+      - 'arena/**'
+  workflow_dispatch:
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-release:
+    name: Build Signed APKs & Publish Release
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Accept Android SDK licenses
+        run: yes | flutter doctor --android-licenses || true
+
+      - name: Bootstrap Android Gradle wrapper & SDK-matched config
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/custom_android
+          cp android/app/src/main/AndroidManifest.xml /tmp/custom_android/AndroidManifest.xml
+          cp android/app/src/main/kotlin/com/example/ai_agent_downloader/MainActivity.kt /tmp/custom_android/MainActivity.kt
+          cp -r android/app/src/main/res/mipmap-* /tmp/custom_android/
+
+          rm -rf android
+          python3 scripts/run_with_annotations.py \
+            flutter create --platforms=android --org com.example --project-name ai_agent_downloader .
+
+          cp /tmp/custom_android/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          mkdir -p android/app/src/main/kotlin/com/example/ai_agent_downloader
+          cp /tmp/custom_android/MainActivity.kt android/app/src/main/kotlin/com/example/ai_agent_downloader/MainActivity.kt
+          cp -r /tmp/custom_android/mipmap-* android/app/src/main/res/
+          chmod +x android/gradlew
+
+      - name: Configure release keystore & Gradle signing
+        run: |
+          set -euo pipefail
+          keytool -genkeypair -v \
+            -keystore android/app/upload-key.jks \
+            -alias upload-key \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=AI Agent Downloader,O=OkAI,C=IN" \
+            -storepass android -keypass android
+
+          cat <<'EOF' > android/key.properties
+          storePassword=android
+          keyPassword=android
+          keyAlias=upload-key
+          storeFile=upload-key.jks
+          EOF
+
+          python3 scripts/configure_android_signing.py
+
+      - name: Install Dart/Flutter dependencies
+        run: python3 scripts/run_with_annotations.py flutter pub get
+
+      - name: Static analysis check
+        run: python3 scripts/run_with_annotations.py flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Build split-per-ABI release APKs
+        run: python3 scripts/run_with_annotations.py flutter build apk --release --split-per-abi
+
+      - name: Build universal release APK
+        run: python3 scripts/run_with_annotations.py flutter build apk --release
+
+      - name: Package & verify release APKs
+        run: |
+          set -euo pipefail
+          mkdir -p release-apks
+          ls -lh build/app/outputs/flutter-apk/
+
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk release-apks/AI-Agent-Downloader-arm64-v8a.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk release-apks/AI-Agent-Downloader-armeabi-v7a.apk
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk release-apks/AI-Agent-Downloader-x86_64.apk
+          cp build/app/outputs/flutter-apk/app-release.apk release-apks/AI-Agent-Downloader-universal.apk
+
+          for apk in release-apks/*.apk; do
+            size=$(stat -c%s "$apk")
+            echo "Verified $apk (${size} bytes)"
+            if [ "$size" -lt 1000000 ]; then
+              echo "::error title=InvalidAPK::$apk is unexpectedly small (${size} bytes)"
+              exit 1
+            fi
+          done
+
+          (cd release-apks && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Upload APKs as workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: AI-Agent-Downloader-APKs
+          path: release-apks/
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="v1.0.${GITHUB_RUN_NUMBER}"
+          TITLE="AI Agent Downloader ${TAG}"
+
+          cat <<EOF > /tmp/release_notes.md
+          ## AI Agent Downloader — Android Release (${TAG})
+
+          Signed release APKs built automatically from commit \`${GITHUB_SHA}\`.
+
+          ### Which APK should I install?
+          - **\`AI-Agent-Downloader-arm64-v8a.apk\`** *(Recommended)* — Modern 64-bit Android phones & tablets.
+          - **\`AI-Agent-Downloader-armeabi-v7a.apk\`** — Older 32-bit ARM Android devices.
+          - **\`AI-Agent-Downloader-universal.apk\`** — Universal APK supporting all CPU architectures.
+          - **\`AI-Agent-Downloader-x86_64.apk\`** — Android emulators / Chromebooks (x86_64).
+
+          ### SHA-256 Checksums
+          \`\`\`
+          $(cat release-apks/SHA256SUMS.txt)
+          \`\`\`
+          EOF
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release-apks/*.apk release-apks/SHA256SUMS.txt --clobber
+          else
+            gh release create "$TAG" \
+              release-apks/*.apk \
+              release-apks/SHA256SUMS.txt \
+              --target "${GITHUB_SHA}" \
+              --title "$TITLE" \
+              --notes-file /tmp/release_notes.md
+          fi

@@ -1,0 +1,211 @@
+import 'package:flutter/material.dart';
+
+import 'screens/history_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/settings_screen.dart';
+import 'screens/task_screen.dart';
+import 'screens/upload_screen.dart';
+import 'services/api_service.dart';
+import 'services/settings_service.dart';
+import 'services/upload_manager.dart';
+
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const AiAgentApp());
+}
+
+class AiAgentApp extends StatefulWidget {
+  const AiAgentApp({super.key});
+
+  @override
+  State<AiAgentApp> createState() => _AiAgentAppState();
+}
+
+class _AiAgentAppState extends State<AiAgentApp> {
+  late final SettingsService _settings;
+  late final ApiService _api;
+  late final UploadManager _uploadManager;
+  bool _ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _settings = SettingsService();
+    _api = ApiService();
+    _uploadManager = UploadManager(api: _api);
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    final savedUrl = await _settings.getServerUrl();
+    if (!mounted) return;
+    _api.baseUrl = savedUrl;
+    setState(() {
+      _ready = true;
+    });
+  }
+
+  @override
+  void dispose() {
+    _uploadManager.dispose();
+    _api.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'AI Agent Downloader',
+      debugShowCheckedModeBanner: false,
+      themeMode: ThemeMode.system,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF4F46E5),
+          brightness: Brightness.light,
+        ),
+      ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF6366F1),
+          brightness: Brightness.dark,
+        ),
+      ),
+      home: _ready
+          ? HomePage(
+              settings: _settings,
+              api: _api,
+              uploadManager: _uploadManager,
+            )
+          : const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
+    );
+  }
+}
+
+class HomePage extends StatefulWidget {
+  const HomePage({
+    super.key,
+    required this.settings,
+    required this.api,
+    required this.uploadManager,
+  });
+
+  final SettingsService settings;
+  final ApiService api;
+  final UploadManager uploadManager;
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int _selectedIndex = 0;
+
+  void _selectTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+    if (index == 2) {
+      // Refresh History whenever user switches to the History tab
+      widget.api.notifyHistoryChanged();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([widget.api, widget.uploadManager]),
+      builder: (context, _) {
+        final totalActiveCount = widget.uploadManager.activeItems.length +
+            widget.api.activeServerTaskCount;
+
+        final pages = <Widget>[
+          HomeScreen(
+            api: widget.api,
+            onViewTasks: () => _selectTab(1),
+            onOpenSettings: () => _selectTab(4),
+          ),
+          TaskScreen(
+            api: widget.api,
+            uploadManager: widget.uploadManager,
+            onGoHome: () => _selectTab(0),
+            onOpenSettings: () => _selectTab(4),
+          ),
+          HistoryScreen(
+            api: widget.api,
+            onOpenSettings: () => _selectTab(4),
+          ),
+          UploadScreen(
+            api: widget.api,
+            uploadManager: widget.uploadManager,
+            onOpenSettings: () => _selectTab(4),
+          ),
+          SettingsScreen(
+            settings: widget.settings,
+            api: widget.api,
+          ),
+        ];
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text(
+              'AI Agent Downloader',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            centerTitle: false,
+          ),
+          body: SafeArea(
+            child: IndexedStack(
+              index: _selectedIndex,
+              children: pages,
+            ),
+          ),
+          bottomNavigationBar: NavigationBar(
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: _selectTab,
+            animationDuration: const Duration(milliseconds: 300),
+            labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+            destinations: [
+              const NavigationDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home),
+                label: 'Home',
+              ),
+              NavigationDestination(
+                icon: Badge.count(
+                  count: totalActiveCount,
+                  isLabelVisible: totalActiveCount > 0,
+                  child: const Icon(Icons.file_download_outlined),
+                ),
+                selectedIcon: Badge.count(
+                  count: totalActiveCount,
+                  isLabelVisible: totalActiveCount > 0,
+                  child: const Icon(Icons.file_download),
+                ),
+                label: 'Task',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.history_outlined),
+                selectedIcon: Icon(Icons.history),
+                label: 'History',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.cloud_upload_outlined),
+                selectedIcon: Icon(Icons.cloud_upload),
+                label: 'Upload',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.settings_outlined),
+                selectedIcon: Icon(Icons.settings),
+                label: 'Settings',
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
