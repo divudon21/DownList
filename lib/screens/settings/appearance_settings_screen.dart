@@ -72,6 +72,7 @@ class AppearanceSettingsScreen extends StatelessWidget {
               LayoutBuilder(builder: (context, constraints) {
                 final columns = constraints.maxWidth < 290 ? 3 : 5;
                 return GridView.builder(
+                  key: const PageStorageKey('accent-grid-scroll'),
                   itemCount: appAccents.length,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
