@@ -5,10 +5,17 @@ from pathlib import Path
 import sys
 
 
-KTS_PROPERTIES = """val keystoreProperties = java.util.Properties()
+KTS_TOP_IMPORTS = """import java.io.FileInputStream
+import java.util.Properties
+
+"""
+
+KTS_PROPERTIES = """val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
-    java.io.FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
+    FileInputStream(keystorePropertiesFile).use { stream ->
+        keystoreProperties.load(stream)
+    }
 }
 """
 
@@ -17,7 +24,10 @@ KTS_SIGNING_BLOCK = """    signingConfigs {
             create("release") {
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
-                storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
+                val storeFilePath = keystoreProperties.getProperty("storeFile")
+                if (storeFilePath != null) {
+                    storeFile = file(storeFilePath)
+                }
                 storePassword = keystoreProperties.getProperty("storePassword")
             }
         }
@@ -37,6 +47,8 @@ def patch_kts(path: Path) -> None:
     if "keystorePropertiesFile" in content:
         print(f"{path} already configured for release signing.")
         return
+
+    content = KTS_TOP_IMPORTS + content
 
     plugins_end = content.find("}\n", content.find("plugins {"))
     if plugins_end == -1:
